@@ -9,7 +9,7 @@ Napisz program, który wczyta plik zawierający opis środowiska uproszczonego W
 
 W ten sposób agent aktualizuje swoją wiedzę o stanie środowiska (wnioskuje na temat nieobserwowalnej części świata).
 
->> Do odpalenia zadania lokalnie potrzebne jest zainstalowanie pakietu [misio](misio).
+>> Do odpalenia zadania lokalnie  **może** się przydać pakiet [misio](../misio).
 
 ## Opis wejścia i wyjścia
 
@@ -23,10 +23,9 @@ W ten sposób agent aktualizuje swoją wiedzę o stanie środowiska (wnioskuje n
 
 ## Zaliczenie
 * Praca indywidualna.
-* Program należy zgłosić na [Optil.io](https://www.optil.io/optilion/author/problem/3159).
+* Program należy zgłosić na [Optil.io](https://www.optil.io/optilion/problem/3159).
 * Termin: **godzina przed** kolejnymi zajęciami (planowo tydzień)
 
 ## Punktacja
-* **15** punktów: **12**\*poprawność + **3**\*szybkość wykonania
-* **10 pkt** + ewentualne punkty bonusowe
-* **Spóźnienie**: **-3** punkty za każdy rozpoczęty tydzień (punkty mogą być ujemne; nie oddanie zadanie w ogóle skutkuje oceną 2 z przedmiotu).
+* **15** punktów - średnia z 15 instancji; do części z nich zostały opublikowane pliki wejściowe, a do części nawet pliki wyjściowe, vide [test_cases](test_cases)
+* **Spóźnienie**: **-20%** za każdy rozpoczęty tydzień spóźnienia
