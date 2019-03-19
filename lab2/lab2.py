@@ -1,11 +1,107 @@
 from aima3.agents import *
 from misio.aima import *
-from utils import *
 import numpy as np
 
-optilio_mode = False
+optilio_mode = True
 dir = 'test_cases'
-filename = '2015.in'
+
+np.set_printoptions(precision=2, floatmode='fixed')
+
+import numpy as np
+
+# O has value of 5 to distinguish form a sum of 4 B
+state_to_num_mapping = {
+    '?': 0,
+    'B': 1,
+    'O': 5
+}
+
+class test_case(object):
+    # test_case.size is a real size of the input data
+    # test_case.data_matrix_size may be equal to test_case.size or may have 1 cell offset
+
+    def __init__(self, optilio_mode):
+        self.size = (0, 0)
+        self.data_matrix_size = (0,0)
+        self.probability = 0.0
+        self.data = None
+        self.optilio_mode = optilio_mode
+        self.probabilities = None
+        self.visited = None
+        self.extended_data_matrix = False
+        self.ground_truth = None
+
+    def parse_test_case(self, lines, extended):
+        if extended:
+            self.extended_data_matrix = True
+            self.data_matrix_size = (self.size[0]+2, self.size[1]+2)
+            self.data = np.zeros(self.data_matrix_size)
+        else:
+            self.data_matrix_size = self.size
+            self.data = np.zeros(self.size)
+
+        offset = 1 if self.extended_data_matrix else 0
+        for row in range(self.size[0]):
+            for column in range(self.size[1]):
+                self.data[row + offset, column + offset] = state_to_num_mapping[lines[row][column]]
+
+        self.probabilities = np.full(self.size, self.probability)
+        self.visited = np.full(self.size, False)
+
+    def check_differences(self):
+        try:
+            print(self.ground_truth - self.probabilities)
+        except:
+            pass
+
+def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
+    import os
+    in_path = '{}/{}/{}.in'.format(os.getcwd(), dir, filename)
+    out_path = '{}/{}/{}.out'.format(os.getcwd(), dir, filename)
+
+    test_cases = []
+    with open(in_path, 'r') as file:
+        no_test_cases = int(file.readline())
+        if not optilio_mode:
+            print("file {}, test cases: {}".format(in_path, no_test_cases))
+        for _ in range(no_test_cases):
+            size = tuple([int(x) for x in file.readline().split(' ')])
+            # read probability for the current test case
+            probability = float(file.readline())
+            # read all lines for the current problem
+            lines = [file.readline() for _ in range(size[0])]
+            case = test_case(optilio_mode)
+            case.size = size
+            case.probability = probability
+            case.parse_test_case(lines, extended_data_matrix)
+            test_cases.append(case)
+
+
+    try:
+        with open(out_path, 'r') as file:
+            for case in test_cases:
+                case.ground_truth = np.array([[float(x) for x in file.readline().split(' ')] for _ in range(case.size[0])])
+    except:
+        pass
+
+    return test_cases
+
+def parse_test_data_from_input(optilio_mode, extended_data_matrix):
+    no_test_cases = int(input())
+    test_cases = []
+    if not optilio_mode:
+        print('stdin, no of test cases {}'.format(no_test_cases))
+    for _ in range(no_test_cases):
+        size = tuple([int(x) for x in input().split(' ')])
+        probability = float(input())
+        lines = [input() for _ in range(size[0])]
+        case = test_case(optilio_mode)
+        case.size = size
+        case.probability = probability
+        case.parse_test_case(lines, extended_data_matrix)
+        test_cases.append(case)
+
+    return test_cases
 
 def find_front(x, y, test_case):
     pass
@@ -54,21 +150,37 @@ def calculate_probabilities(test_case):
     for row in range(test_case.visited.shape[0]):
         for column in range(test_case.visited.shape[1]):
             if not test_case.visited[row, column]:
+                pass
 
-
-def main():
-    tests = []
     if optilio_mode:
-        tests = parse_test_data_from_input(optilio_mode)
-    else:
-        import os
-        path = '{}/{}/{}'.format(os.getcwd(), dir, filename)
-        tests = parse_test_data(path, optilio_mode, extended_data_matrix = True)
+        for row in range(test_case.probabilities.shape[0]):
+            for column in range(test_case.probabilities.shape[1]):
+                print(test_case.probabilities[row, column])
+            print()
+        # print(test_case.probabilities)
 
-    test_case = tests[1]
+filename = '2019_00_small'
+
+
+# def main():
+tests = []
+if optilio_mode:
+    tests = parse_test_data_from_input(optilio_mode, extended_data_matrix = True)
+else:
+    tests = parse_test_data(dir, filename, optilio_mode, extended_data_matrix = True)
+
+if optilio_mode:
+    [calculate_probabilities(test_case) for test_case in tests]
+else:
+    test_case = tests[0]
+    print(test_case.data[1:-1, 1:-1])
     calculate_probabilities(test_case)
     print(test_case.visited)
     print(test_case.probabilities)
+    print()
+    print(test_case.ground_truth)
+    print()
+    test_case.check_differences()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

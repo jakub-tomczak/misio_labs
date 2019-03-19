@@ -20,6 +20,7 @@ class test_case(object):
         self.probabilities = None
         self.visited = None
         self.extended_data_matrix = False
+        self.ground_truth = None
 
     def parse_test_case(self, lines, extended):
         if extended:
@@ -38,12 +39,22 @@ class test_case(object):
         self.probabilities = np.full(self.size, self.probability)
         self.visited = np.full(self.size, False)
 
-def parse_test_data(filename, optilio_mode, extended_data_matrix):
-    with open(filename, 'r') as file:
+    def check_differences(self):
+        try:
+            print(self.ground_truth - self.probabilities)
+        except:
+            pass
+
+def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
+    import os
+    in_path = '{}/{}/{}.in'.format(os.getcwd(), dir, filename)
+    out_path = '{}/{}/{}.out'.format(os.getcwd(), dir, filename)
+
+    test_cases = []
+    with open(in_path, 'r') as file:
         no_test_cases = int(file.readline())
-        test_cases = []
         if not optilio_mode:
-            print("file {}, test cases: {}".format(filename, no_test_cases))
+            print("file {}, test cases: {}".format(in_path, no_test_cases))
         for _ in range(no_test_cases):
             size = tuple([int(x) for x in file.readline().split(' ')])
             # read probability for the current test case
@@ -55,7 +66,16 @@ def parse_test_data(filename, optilio_mode, extended_data_matrix):
             case.probability = probability
             case.parse_test_case(lines, extended_data_matrix)
             test_cases.append(case)
-        return test_cases
+
+
+    try:
+        with open(out_path, 'r') as file:
+            for case in test_cases:
+                case.ground_truth = np.array([[float(x) for x in file.readline().split(' ')] for _ in range(case.size[0])])
+    except:
+        pass
+
+    return test_cases
 
 def parse_test_data_from_input(optilio_mode, extended_data_matrix):
     no_test_cases = int(input())
@@ -70,3 +90,6 @@ def parse_test_data_from_input(optilio_mode, extended_data_matrix):
         case.size = size
         case.probability = probability
         case.parse_test_case(lines, extended_data_matrix)
+        test_cases.append(case)
+
+    return test_cases
