@@ -112,6 +112,7 @@ def preprocessing(test_case):
     test_case.probabilities[mask] = 0
     test_case.visited[mask] = True
 
+    # use mask to avoid corner case checking
     mask = np.full((test_case.size[0]+2, test_case.size[1]+2), False)
 
     for row in range(1, test_case.data_matrix_size[0] - 1):
@@ -123,9 +124,15 @@ def preprocessing(test_case):
                 mask[row, column - 1] = True
                 mask[row + 1, column] = True
 
+    # visit all neighbors of `O`
+    mask = mask[1:-1, 1:-1]
+    test_case.probabilities[mask] = 0
+    test_case.visited[mask] = True
 
+    for row in range(1, test_case.data_matrix_size[0] - 1):
+        for column in range(1, test_case.data_matrix_size[1] - 1):
             # too distant `?`
-            elif test_case.data[row, column] == state_to_num_mapping['?']:
+            if test_case.data[row, column] == state_to_num_mapping['?']:
                 sum_around_unknown = test_case.data[row - 1, column] + test_case.data[row, column + 1] + \
                     test_case.data[row, column - 1] + test_case.data[row + 1, column]
 
@@ -134,53 +141,49 @@ def preprocessing(test_case):
                     test_case.visited[row - 1, column - 1] = True
 
                 # around `?` there are at least 3 `B`
+                # TO DO maybe consider only 4 B
                 elif sum_around_unknown == 3 or sum_around_unknown == 4:
                     test_case.visited[row - 1, column - 1] = True
                     test_case.probabilities[row - 1, column - 1] = 1.0
-
-    # visit all neighbors of `O`
-    mask = mask[1:-1, 1:-1]
-    test_case.probabilities[mask] = 0
-    test_case.visited[mask] = True
 
 def calculate_probabilities(test_case):
     preprocessing(test_case)
 
     # calculate probabilities
-    for row in range(test_case.visited.shape[0]):
-        for column in range(test_case.visited.shape[1]):
-            if not test_case.visited[row, column]:
-                pass
+    # for row in range(test_case.visited.shape[0]):
+    #     for column in range(test_case.visited.shape[1]):
+    #         if not test_case.visited[row, column]:
+    #             pass
 
     if optilio_mode:
         for row in range(test_case.probabilities.shape[0]):
             for column in range(test_case.probabilities.shape[1]):
-                print(test_case.probabilities[row, column])
+                print(test_case.probabilities[row, column], end=' ')
             print()
-        # print(test_case.probabilities)
 
 filename = '2019_00_small'
 
+def main():
+    tests = []
+    if optilio_mode:
+        tests = parse_test_data_from_input(optilio_mode, extended_data_matrix = True)
+    else:
+        tests = parse_test_data(dir, filename, optilio_mode, extended_data_matrix = True)
 
-# def main():
-tests = []
-if optilio_mode:
-    tests = parse_test_data_from_input(optilio_mode, extended_data_matrix = True)
-else:
-    tests = parse_test_data(dir, filename, optilio_mode, extended_data_matrix = True)
+    if optilio_mode:
+        [calculate_probabilities(test_case) for test_case in tests]
+    else:
+        test_case = tests[0]
+        # print(test_case.data[1:-1, 1:-1])
+        calculate_probabilities(test_case)
 
-if optilio_mode:
-    [calculate_probabilities(test_case) for test_case in tests]
-else:
-    test_case = tests[0]
-    print(test_case.data[1:-1, 1:-1])
-    calculate_probabilities(test_case)
-    print(test_case.visited)
-    print(test_case.probabilities)
-    print()
-    print(test_case.ground_truth)
-    print()
-    test_case.check_differences()
 
-# if __name__ == "__main__":
-#     main()
+        # print(test_case.visited)
+        # print(test_case.probabilities)
+        # print()
+        # print(test_case.ground_truth)
+        # print()
+        # test_case.check_differences()
+
+if __name__ == "__main__":
+    main()
