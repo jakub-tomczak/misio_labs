@@ -224,6 +224,18 @@ def preprocessing(test_case):
 def calculate_probabilities(test_case):
     preprocessing(test_case)
 
+    row = 0
+    col = 4
+    row = row + 1
+    col = col + 1
+    front = []
+    test_case.during_check = np.zeros(test_case.size, dtype=bool)
+    find_front(row-1, col-1, front, test_case, (-1, (-1, -1)))
+    neighbors_sum = test_case.data[row-1, col] + test_case.data[row, col - 1] + test_case.data[row, col+1] + test_case.data[row+1, col]
+    if len(front) == 0 and neighbors_sum > 0 and neighbors_sum < 5:
+        test_case.probabilities[row-1, col-1] = 1.0
+        test_case.visited[row-1, col-1] = True
+    return
 
     # calculate probabilities
     for row in range(test_case.visited.shape[0]):
@@ -241,7 +253,7 @@ def calculate_probabilities(test_case):
                 print(test_case.probabilities[row, column], end=' ')
             print()
 
-filename = 'file' #2019_00_small
+filename = '2015' #2019_00_small
 
 def main():
     tests = []
@@ -257,7 +269,7 @@ def main():
         # print(test_case.data[1:-1, 1:-1])
         calculate_probabilities(test_case)
 
-
+        print('{}summary{}'.format('-'*10, '-'*10))
         print(test_case.visited)
         print(test_case.probabilities)
         print()
