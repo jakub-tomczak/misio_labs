@@ -51,7 +51,7 @@ class Front:
         self.cells_in_front = cells
         self.breezes = set()
         for cell in self.cells_in_front:
-            self.breezes.add(cell.breezes_in_neighborhood)
+            self.breezes |= cell.breezes_in_neighborhood
 
     def __len__(self):
         return len(self.cells_in_front)
@@ -306,7 +306,10 @@ def calculate_probabilities(test_case):
     for row in range(test_case.visited.shape[0]):
         for column in range(1, test_case.visited.shape[1]):
             if not test_case.visited[row, column]:
-                front = Front([])
+                # add the current cell to its front
+                current_cell = element_to_front(row, column, test_case)
+                front = Front([current_cell])
+
                 test_case.during_check = np.zeros(test_case.size, dtype=bool)
                 find_front(row, column, front, test_case, (-1, (-1, -1)))
 
@@ -315,7 +318,7 @@ def calculate_probabilities(test_case):
                                 test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
                 # if neighbors_sum is between 0 and 5 it means that there is at least one B
                 # if front is empty and there is at least one B it means that this cell must be a hole
-                if len(front) == 0 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
+                if len(front) == 1 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
                     test_case.probabilities[row, column] = 1.0
                     test_case.visited[row, column] = True
                     continue
@@ -339,8 +342,10 @@ def calculate_probabilities(test_case):
                     for f in front.cells_in_front:
                         if cell_to_binary_position_mapping[f] & i:
                             new_breeze |= f.breezes_in_neighborhood
+
+                            # break when all breezes have at least one active ? field around
                             if len(new_breeze) == len(front.get_breezes()):
-                                print("legal combination is {}".format(i))
+                                debug_print("legal combination is {}".format(i))
                                 legal_combinations.append(i)
                                 break
     return
