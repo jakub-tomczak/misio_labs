@@ -32,16 +32,16 @@ def debug_print(text):
 
 
 def display_front(row, col, front, test_case):
-    print("{}front for row:{} col:{}{}".format('*' * 5, row, col, '*' * 5))
+    print("{}front for row:{} col:{}{}".format('*' * 15, row, col, '*' * 15))
     front_n = np.zeros(test_case.size)
-    front_n[row, col] = 'X'
+    front_n[row, col] = 3
     for fr in front.cells_in_front:
-        front_n[fr.row, fr.col] = '?'
+        front_n[fr.row, fr.col] = 2
         for breeze in fr.breezes_in_neighborhood:
-            front_n[breeze[0], breeze[1]] = 'B'
+            front_n[breeze[0], breeze[1]] = 1
 
     print(front_n)
-    print("{} end front {}".format('*' * 5, '*' * 5))
+    print("{} end front {}".format('*' * 15, '*' * 15))
 
 
 class Front:
@@ -312,8 +312,7 @@ def calculate_probabilities(test_case):
 
     # display front
     if not optilio_mode:
-        display_front(row, col, front, test_case)
-
+        display_front(row - 1, col - 1, front, test_case)
 
     cell_to_binary_position_mapping = dict()
     for cell, o in zip(front.cells_in_front, range(len(front))):
