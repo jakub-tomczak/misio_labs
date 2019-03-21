@@ -49,6 +49,7 @@ def display_front(row, col, front, test_case):
 class Front:
     def __init__(self, cells):
         self.cells_in_front = cells
+        self.cells_in_front_set = set(cells)
         self.breezes = set()
         for cell in self.cells_in_front:
             self.breezes |= cell.breezes_in_neighborhood
@@ -74,6 +75,9 @@ class CellInFront:
 
     def __str__(self):
         return 'row:{} col:{}, breezes{}'.format(self.row, self.col, self.breezes_in_neighborhood)
+
+    def __hash__(self):
+        return 13*(self.row * self.col + len(self.breezes_in_neighborhood))
 
     def get_coordinates(self):
         return self.row, self.col
@@ -277,24 +281,21 @@ def preprocessing(test_case):
         for column in range(1, test_case.data_matrix_size[1] - 1):
             sum_around = test_case.data[row - 1, column] + test_case.data[row, column + 1] + \
                          test_case.data[row, column - 1] + test_case.data[row + 1, column]
+
+            corner_penalty = (0 if 0 < (row - 1) else 1) + (0 if row + 2 < test_case.data_matrix_size[0] else 1) + \
+                             (0 if 0 < (column - 1) else 1) + (0 if column + 2 < test_case.data_matrix_size[1] else 1)
             # too distant `?`
-            if test_case.data[row, column] == state_to_num_mapping['?']:
+            if test_case.data[row, column] == state_to_num_mapping['?'] and sum_around == 0:
 
                 # around `?` there are only `?`
-                if sum_around == 0:
-                    test_case.visited[row - 1, column - 1] = True
+                test_case.visited[row - 1, column - 1] = True
 
-                    # around `?` there are at least 3 `B`
-                    # TO DO maybe consider only 4 B
-                    # this is not correct
-                    # elif sum_around == 3 or sum_around == 4:
-                    #     test_case.visited[row - 1, column - 1] = True
-                    #     test_case.probabilities[row - 1, column - 1] = 1.0
-
-            elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == 3 * state_to_num_mapping[
+            elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == (3 - corner_penalty) * state_to_num_mapping[
                 'O']:
                 for coords in neighbors_coordinates:
-                    if test_case.data[row + coords[0], column + coords[1]] == state_to_num_mapping['?']:
+                    if 0 < row + coords[0] < test_case.data_matrix_size[0] - 1 \
+                            and 0 < column + coords[1] < test_case.data_matrix_size[1] - 1 \
+                            and test_case.data[row + coords[0], column + coords[1]] == state_to_num_mapping['?']:
                         test_case.visited[row + coords[0] - 1, column + coords[1] - 1] = True
                         test_case.probabilities[row + coords[0] - 1, column + coords[1] - 1] = 1.0
 
@@ -304,6 +305,7 @@ def calculate_probabilities(test_case):
     print(test_case.visited)
     # calculate probabilities
 
+    all_fronts = []
     for row in range(test_case.visited.shape[0]):
         for column in range(test_case.visited.shape[1]):
             if not test_case.visited[row, column]:
@@ -314,6 +316,7 @@ def calculate_probabilities(test_case):
                 test_case.during_check = np.zeros(test_case.size, dtype=bool)
                 find_front(row, column, front, test_case, (-1, (-1, -1)))
 
+                all_fronts.append(front)
                 # set probability == 1 to all '?' without front and with 'B' as neighbor
                 neighbors_sum = test_case.data[row, column + 1] + test_case.data[row + 1, column] + \
                                 test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
@@ -400,7 +403,7 @@ def calculate_probabilities(test_case):
             print()
 
 
-filename = '2015'  # 2019_00_small
+filename = 'file'  # 2019_00_small
 
 
 def main():
