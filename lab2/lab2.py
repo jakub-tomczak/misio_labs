@@ -29,7 +29,32 @@ def debug_print(text):
     if not optilio_mode:
         print(text)
 
-class test_case(object):
+
+class Front:
+    def __init__(self, cells):
+        self.cells_in_front = cells
+        self.breezes = set()
+        for cell in self.cells_in_front:
+            self.breezes.add(cell.breezes_in_neighborhood)
+
+    # add cell with all its breezes,
+    # merge the existing breezes set with cell's breezes
+    def add_cell(self, cell):
+        self.cells_in_front.append(cell)
+        self.breezes |= cell.breezes_in_neighborhood
+
+    def get_breezes(self):
+        return self.breezes
+
+
+class CellInFront:
+    def __init__(self, row, col):
+        self.row = row
+        self.col = col
+        self.breezes_in_neighborhood = set()
+
+
+class TestCase:
     # test_case.size is a real size of the input data
     # test_case.data_matrix_size may be equal to test_case.size or may have 1 cell offset
 
@@ -95,7 +120,7 @@ def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
             probability = float(file.readline())
             # read all lines for the current problem
             lines = [file.readline() for _ in range(size[0])]
-            case = test_case(optilio_mode)
+            case = TestCase(optilio_mode)
             case.size = size
             case.probability = probability
             case.parse_test_case(lines, extended_data_matrix)
@@ -120,7 +145,7 @@ def parse_test_data_from_input(optilio_mode, extended_data_matrix):
         size = tuple([int(x) for x in input().split(' ')])
         probability = float(input())
         lines = [input() for _ in range(size[0])]
-        case = test_case(optilio_mode)
+        case = TestCase(optilio_mode)
         case.size = size
         case.probability = probability
         case.parse_test_case(lines, extended_data_matrix)
