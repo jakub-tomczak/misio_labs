@@ -27,22 +27,24 @@ neighbors_coordinates = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
 
 def debug_print(text):
+    return
     if not optilio_mode:
         print(text)
 
 
 def display_front(row, col, front, test_case):
+    np.set_printoptions(precision=0, floatmode='fixed')
     print("{}front for row:{} col:{}{}".format('*' * 15, row, col, '*' * 15))
     front_n = np.zeros(test_case.size)
-    front_n[row, col] = 3
     for fr in front.cells_in_front:
         front_n[fr.row, fr.col] = 2
         for breeze in fr.breezes_in_neighborhood:
             front_n[breeze[0], breeze[1]] = 1
+    front_n[row, col] = 3
 
     print(front_n)
     print("{} end front {}".format('*' * 15, '*' * 15))
-
+    np.set_printoptions(precision=2, floatmode='fixed')
 
 class Front:
     def __init__(self, cells):
@@ -192,6 +194,10 @@ def element_to_front(row, col, test_case):
     return element
 
 
+def are_coords_the_same(coords1, coords2):
+    return coords1[0] == coords2[0] and coords1[1] == coords2[1]
+
+
 # termination indicates whether we came from `B`
 def find_front(row, col, front, test_case, previous):
     previous_sym, previous_coords = previous
@@ -206,6 +212,8 @@ def find_front(row, col, front, test_case, previous):
     if test_case.during_check[row, col]:
         debug_print('{}, {} is already during checking'.format(row, col))
         return
+    test_case.during_check[row, col] = True
+
 
     if test_case.visited[row, col] and (
                     test_case.raw_data[row, col] == state_to_num_mapping['O'] or test_case.raw_data[row, col] ==
@@ -217,8 +225,6 @@ def find_front(row, col, front, test_case, previous):
         debug_print('{} {} i am the second ? in a row'.format(row, col))
         return
 
-    test_case.during_check[row, col] = True
-    #
     if num_to_state_mapping[previous_sym] == 'B':
         # came from 'B' and i am '?'
         debug_print('{}, {} i am ?, you came from B, I should be in the front'.format(row, col))
@@ -226,16 +232,16 @@ def find_front(row, col, front, test_case, previous):
 
     next_previous = (test_case.raw_data[row, col], (row, col))
     # go left
-    if col > 0 and col - 1 != previous_coords[1] and row != previous_coords[0]:
+    if col - 1 >= 0 and not are_coords_the_same(coords1=(row, col-1), coords2=previous_coords):
         find_front(row, col - 1, front, test_case, next_previous)
     # go right
-    if col + 1 < test_case.width and col + 1 != previous_coords[1] and row != previous_coords[0]:
+    if col + 1 < test_case.width and not are_coords_the_same(coords1=(row, col+1), coords2=previous_coords):
         find_front(row, col + 1, front, test_case, next_previous)
     # go up
-    if row > 0 and col != previous_coords[1] and row - 1 != previous_coords[0]:
+    if row - 1 >= 0 and not are_coords_the_same(coords1=(row-1, col), coords2=previous_coords):
         find_front(row - 1, col, front, test_case, next_previous)
     # go down
-    if row + 1 < test_case.height and col != previous_coords[1] and row + 1 != previous_coords[0]:
+    if row + 1 < test_case.height and not are_coords_the_same(coords1=(row+1, col), coords2=previous_coords):
         find_front(row + 1, col, front, test_case, next_previous)
 
 
@@ -294,7 +300,50 @@ def preprocessing(test_case):
 
 def calculate_probabilities(test_case):
     preprocessing(test_case)
+    print(test_case.visited)
+    # calculate probabilities
 
+    for row in range(test_case.visited.shape[0]):
+        for column in range(1, test_case.visited.shape[1]):
+            if not test_case.visited[row, column]:
+                front = Front([])
+                test_case.during_check = np.zeros(test_case.size, dtype=bool)
+                find_front(row, column, front, test_case, (-1, (-1, -1)))
+
+                # set probability == 1 to all '?' without front and with 'B' as neighbor
+                neighbors_sum = test_case.data[row, column + 1] + test_case.data[row + 1, column] + \
+                                test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
+                # if neighbors_sum is between 0 and 5 it means that there is at least one B
+                # if front is empty and there is at least one B it means that this cell must be a hole
+                if len(front) == 0 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
+                    test_case.probabilities[row, column] = 1.0
+                    test_case.visited[row, column] = True
+                    continue
+
+                # display front
+                if not optilio_mode:
+                    display_front(row, column, front, test_case)
+
+                # create mapping from ? to a position in a binary number
+                cell_to_binary_position_mapping = dict()
+                for cell, o in zip(front.cells_in_front, range(len(front))):
+                    debug_print(
+                        '{}, {}: {},\tbreezes {}'.format(cell.row, cell.col, 1 << o, cell.breezes_in_neighborhood))
+                    cell_to_binary_position_mapping[cell] = 1 << o
+
+                # find all legal combinations
+                legal_combinations = []
+                num_of_combinations = 1 << len(front)
+                for i in range(1, 1 + num_of_combinations):
+                    new_breeze = set()
+                    for f in front.cells_in_front:
+                        if cell_to_binary_position_mapping[f] & i:
+                            new_breeze |= f.breezes_in_neighborhood
+                            if len(new_breeze) == len(front.get_breezes()):
+                                print("legal combination is {}".format(i))
+                                legal_combinations.append(i)
+                                break
+    return
     row = 0
     col = 0
     row = row + 1
@@ -303,45 +352,13 @@ def calculate_probabilities(test_case):
     test_case.during_check = np.zeros(test_case.size, dtype=bool)
     find_front(row - 1, col - 1, front, test_case, (-1, (-1, -1)))
 
-    # set probability == 1 to all '?' without front and with 'B' as neighbor
-    neighbors_sum = test_case.data[row - 1, col] + test_case.data[row, col - 1] + test_case.data[row, col + 1] + \
-                    test_case.data[row + 1, col]
-    if len(front) == 0 and 0 < neighbors_sum < 5:
-        test_case.probabilities[row - 1, col - 1] = 1.0
-        test_case.visited[row - 1, col - 1] = True
-
     # display front
     if not optilio_mode:
         display_front(row - 1, col - 1, front, test_case)
 
-    cell_to_binary_position_mapping = dict()
-    for cell, o in zip(front.cells_in_front, range(len(front))):
-        debug_print('{}, {}: {},\tbreezes {}'.format(cell.row, cell.col, 1 << o, cell.breezes_in_neighborhood))
-        cell_to_binary_position_mapping[cell] = 1 << o
 
-    legal_combinations = []
-    num_of_combinations = 1 << len(front)
-    for i in range(1, 1 + num_of_combinations):
-        new_breeze = set()
-        for f in front.cells_in_front:
-            if cell_to_binary_position_mapping[f] & i:
-                new_breeze |= f.breezes_in_neighborhood
-                if len(new_breeze) == len(front.get_breezes()):
-                    debug_print("legal combination is {}".format(i))
-                    legal_combinations.append(i)
-                    break
 
     return
-
-    # calculate probabilities
-    for row in range(test_case.visited.shape[0]):
-        for column in range(test_case.visited.shape[1]):
-            if not test_case.visited[row, column]:
-                front = []
-                test_case.during_check = np.zeros(test_case.size, dtype=bool)
-                find_front(row, column, front, test_case, (-1, (-1, -1)))
-            # check only one place
-            return
 
     if optilio_mode:
         for row in range(test_case.probabilities.shape[0]):
@@ -350,7 +367,7 @@ def calculate_probabilities(test_case):
             print()
 
 
-filename = 'file'  # 2019_00_small
+filename = '2015'  # 2019_00_small
 
 
 def main():
