@@ -75,14 +75,17 @@ class CellInFront:
     def __str__(self):
         return 'row:{} col:{}, breezes{}'.format(self.row, self.col, self.breezes_in_neighborhood)
 
+    def get_coordinates(self):
+        return self.row, self.col
+
 
 class TestCase:
+    probability = 0.0
     # test_case.size is a real size of the input data
     # test_case.data_matrix_size may be equal to test_case.size or may have 1 cell offset
     def __init__(self, optilio_mode):
         self.size = (0, 0)
         self.data_matrix_size = (0, 0)
-        self.probability = 0.0
         # contains loaded data with optional 1 cell offset
         self.data = None
         # contains raw loaded data without any offset
@@ -139,12 +142,11 @@ def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
         for _ in range(no_test_cases):
             size = tuple([int(x) for x in file.readline().split(' ')])
             # read probability for the current test case
-            probability = float(file.readline())
+            TestCase.probability = float(file.readline())
             # read all lines for the current problem
             lines = [file.readline() for _ in range(size[0])]
             case = TestCase(optilio_mode)
             case.size = size
-            case.probability = probability
             case.parse_test_case(lines, extended_data_matrix)
             test_cases.append(case)
 
@@ -166,11 +168,10 @@ def parse_test_data_from_input(optilio_mode, extended_data_matrix):
 
     for _ in range(no_test_cases):
         size = tuple([int(x) for x in input().split(' ')])
-        probability = float(input())
+        TestCase.probability = float(input())
         lines = [input() for _ in range(size[0])]
         case = TestCase(optilio_mode)
         case.size = size
-        case.probability = probability
         case.parse_test_case(lines, extended_data_matrix)
         test_cases.append(case)
 
@@ -304,7 +305,7 @@ def calculate_probabilities(test_case):
     # calculate probabilities
 
     for row in range(test_case.visited.shape[0]):
-        for column in range(1, test_case.visited.shape[1]):
+        for column in range(test_case.visited.shape[1]):
             if not test_case.visited[row, column]:
                 # add the current cell to its front
                 current_cell = element_to_front(row, column, test_case)
@@ -329,13 +330,21 @@ def calculate_probabilities(test_case):
 
                 # create mapping from ? to a position in a binary number
                 cell_to_binary_position_mapping = dict()
+                reversed_cell_to_binary_position_mapping = dict()
                 for cell, o in zip(front.cells_in_front, range(len(front))):
                     debug_print(
                         '{}, {}: {},\tbreezes {}'.format(cell.row, cell.col, 1 << o, cell.breezes_in_neighborhood))
                     cell_to_binary_position_mapping[cell] = 1 << o
+                    reversed_cell_to_binary_position_mapping[1 << o] = cell
 
                 # find all legal combinations
                 legal_combinations = []
+                # active == the current cell is true in that combination
+                # active_combinations = []
+                # inactive == the current cell is false in that combination
+                # inactive_combinations = []
+                # two lists above are not necessary since the current cell is always the first one in the dict
+                # so it is active in odd combinations!
                 num_of_combinations = 1 << len(front)
                 for i in range(1, 1 + num_of_combinations):
                     new_breeze = set()
@@ -343,11 +352,30 @@ def calculate_probabilities(test_case):
                         if cell_to_binary_position_mapping[f] & i:
                             new_breeze |= f.breezes_in_neighborhood
 
-                            # break when all breezes have at least one active ? field around
-                            if len(new_breeze) == len(front.get_breezes()):
-                                debug_print("legal combination is {}".format(i))
-                                legal_combinations.append(i)
-                                break
+                    # all breezes have at least one active ? field around -> get as much as possible
+                    # which means that we always find all possibilities
+                    # TODO check whether it is possible to take only the minimal subset of cells to combination
+                    if len(new_breeze) == len(front.get_breezes()):
+                        debug_print("legal combination is {}".format(i))
+                        legal_combinations.append(i)
+
+                # calculate the cumulative probability
+                p_active = 1.0
+                p_inactive = 1.0
+                for combination in legal_combinations:
+                    for cell in front.cells_in_front:
+                        # don't add the current cell's probability
+                        if cell == current_cell:
+                            continue
+                        if combination & cell_to_binary_position_mapping[cell]:
+                            if not combination % 2:
+                                # active
+                                p_active = p_active * test_case.probabilities[cell.get_coordinates()]
+                            else:
+                                p_inactive = p_inactive * test_case.probabilities[cell.get_coordinates()]
+                norm = 1.0 / (p_active + p_inactive)
+                test_case.probabilities[row, column] = norm*p_active*TestCase.probability
+                print(p_active, p_inactive, norm*p_active, norm*p_inactive)
     return
     row = 0
     col = 0
