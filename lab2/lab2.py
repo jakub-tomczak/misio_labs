@@ -1,13 +1,13 @@
 from aima3.agents import *
 from misio.aima import *
 import numpy as np
+import numpy as np
 
-optilio_mode = False
+optilio_mode = True
 dir = 'test_cases'
 
-np.set_printoptions(precision=2, floatmode='fixed')
+np.set_printoptions(precision=2)
 
-import numpy as np
 
 # O has value of 5 to distinguish form a sum of 4 B
 state_to_num_mapping = {
@@ -27,7 +27,6 @@ neighbors_coordinates = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
 
 def debug_print(text):
-    return
     if not optilio_mode:
         print(text)
 
@@ -45,6 +44,7 @@ def display_front(row, col, front, test_case):
     print(front_n)
     print("{} end front {}".format('*' * 15, '*' * 15))
     np.set_printoptions(precision=2, floatmode='fixed')
+
 
 class Front:
     def __init__(self, cells):
@@ -67,7 +67,7 @@ class Front:
         return self.breezes
 
 
-class CellInFront:
+class CellInFront(object):
     def __init__(self, row, col):
         self.row = row
         self.col = col
@@ -77,7 +77,13 @@ class CellInFront:
         return 'row:{} col:{}, breezes{}'.format(self.row, self.col, self.breezes_in_neighborhood)
 
     def __hash__(self):
-        return 13*(self.row * self.col + len(self.breezes_in_neighborhood))
+        return (self.row * self.col + len(self.breezes_in_neighborhood))
+
+    def __eq__(self, other):
+        if not isinstance(other, CellInFront):
+            return False
+        elif self.row == other.row and self.col == other.col:
+            return True
 
     def get_coordinates(self):
         return self.row, self.col
@@ -85,6 +91,7 @@ class CellInFront:
 
 class TestCase:
     probability = 0.0
+
     # test_case.size is a real size of the input data
     # test_case.data_matrix_size may be equal to test_case.size or may have 1 cell offset
     def __init__(self, optilio_mode):
@@ -121,8 +128,8 @@ class TestCase:
 
         self.probabilities = np.full(self.size, self.probability)
         self.visited = np.zeros(self.size, dtype=bool)
-        self.width = self.size[0]
-        self.height = self.size[1]
+        self.width = self.size[1]
+        self.height = self.size[0]
 
     def clear_during_check(self):
         self.during_check = np.zeros(self.size, dtype=bool)
@@ -203,23 +210,15 @@ def are_coords_the_same(coords1, coords2):
     return coords1[0] == coords2[0] and coords1[1] == coords2[1]
 
 
-# termination indicates whether we came from `B`
 def find_front(row, col, front, test_case, previous):
     previous_sym, previous_coords = previous
-    debug_print("find_front: y:{}, x:{}, what? {}, current front: {}, previous? {}".format(row, col,
-                                                                                           num_to_state_mapping[
-                                                                                               test_case.raw_data[
-                                                                                                   row, col]], front,
-                                                                                           previous))
-    pos = np.zeros(test_case.size)
-    pos[row, col] = 1
-    debug_print(pos)
+    debug_print("find_front: y:{}, x:{}, what? {}, current front: {}, previous? {}"\
+                .format(row, col,num_to_state_mapping[test_case.raw_data[row, col]], front, previous))
+
     if test_case.during_check[row, col]:
         debug_print('{}, {} is already during checking'.format(row, col))
         return
     test_case.during_check[row, col] = True
-
-
     if test_case.visited[row, col] and (
                     test_case.raw_data[row, col] == state_to_num_mapping['O'] or test_case.raw_data[row, col] ==
                 state_to_num_mapping['?']):
@@ -230,23 +229,23 @@ def find_front(row, col, front, test_case, previous):
         debug_print('{} {} i am the second ? in a row'.format(row, col))
         return
 
-    if num_to_state_mapping[previous_sym] == 'B':
+    if num_to_state_mapping[previous_sym] == 'B' and test_case.raw_data[row, col] == state_to_num_mapping['?']:
         # came from 'B' and i am '?'
         debug_print('{}, {} i am ?, you came from B, I should be in the front'.format(row, col))
         front.add_cell(element_to_front(row, col, test_case))
 
     next_previous = (test_case.raw_data[row, col], (row, col))
     # go left
-    if col - 1 >= 0 and not are_coords_the_same(coords1=(row, col-1), coords2=previous_coords):
+    if col - 1 >= 0 and not are_coords_the_same(coords1=(row, col - 1), coords2=previous_coords):
         find_front(row, col - 1, front, test_case, next_previous)
     # go right
-    if col + 1 < test_case.width and not are_coords_the_same(coords1=(row, col+1), coords2=previous_coords):
+    if col + 1 < test_case.width and not are_coords_the_same(coords1=(row, col + 1), coords2=previous_coords):
         find_front(row, col + 1, front, test_case, next_previous)
     # go up
-    if row - 1 >= 0 and not are_coords_the_same(coords1=(row-1, col), coords2=previous_coords):
+    if row - 1 >= 0 and not are_coords_the_same(coords1=(row - 1, col), coords2=previous_coords):
         find_front(row - 1, col, front, test_case, next_previous)
     # go down
-    if row + 1 < test_case.height and not are_coords_the_same(coords1=(row+1, col), coords2=previous_coords):
+    if row + 1 < test_case.height and not are_coords_the_same(coords1=(row + 1, col), coords2=previous_coords):
         find_front(row + 1, col, front, test_case, next_previous)
 
 
@@ -290,8 +289,9 @@ def preprocessing(test_case):
                 # around `?` there are only `?`
                 test_case.visited[row - 1, column - 1] = True
 
-            elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == (3 - corner_penalty) * state_to_num_mapping[
-                'O']:
+            elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == (3 - corner_penalty) * \
+                    state_to_num_mapping[
+                        'O']:
                 for coords in neighbors_coordinates:
                     if 0 < row + coords[0] < test_case.data_matrix_size[0] - 1 \
                             and 0 < column + coords[1] < test_case.data_matrix_size[1] - 1 \
@@ -302,21 +302,29 @@ def preprocessing(test_case):
 
 def calculate_probabilities(test_case):
     preprocessing(test_case)
-    print(test_case.visited)
-    # calculate probabilities
+    debug_print(test_case.visited)
 
-    all_fronts = []
-    for row in range(test_case.visited.shape[0]):
-        for column in range(test_case.visited.shape[1]):
-            if not test_case.visited[row, column]:
+    # stores mapping from a CellInFront to front
+    cell_to_front = dict()
+    creating_front = 0
+    for row in range(test_case.height):
+        for column in range(test_case.width):
+            if test_case.visited[row, column]:
+                continue
+            current_cell = element_to_front(row, column, test_case)
+
+            if current_cell.get_coordinates() not in cell_to_front:
+                # find a front
                 # add the current cell to its front
-                current_cell = element_to_front(row, column, test_case)
                 front = Front([current_cell])
-
+                creating_front = creating_front + 1
                 test_case.during_check = np.zeros(test_case.size, dtype=bool)
                 find_front(row, column, front, test_case, (-1, (-1, -1)))
 
-                all_fronts.append(front)
+                for cell in front.cells_in_front:
+                    cell_to_front[cell] = front
+
+            if not test_case.visited[row, column]:
                 # set probability == 1 to all '?' without front and with 'B' as neighbor
                 neighbors_sum = test_case.data[row, column + 1] + test_case.data[row + 1, column] + \
                                 test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
@@ -329,7 +337,7 @@ def calculate_probabilities(test_case):
 
                 # display front
                 if not optilio_mode:
-                    display_front(row, column, front, test_case)
+                   display_front(row, column, front, test_case)
 
                 # create mapping from ? to a position in a binary number
                 cell_to_binary_position_mapping = dict()
@@ -342,12 +350,6 @@ def calculate_probabilities(test_case):
 
                 # find all legal combinations
                 legal_combinations = []
-                # active == the current cell is true in that combination
-                # active_combinations = []
-                # inactive == the current cell is false in that combination
-                # inactive_combinations = []
-                # two lists above are not necessary since the current cell is always the first one in the dict
-                # so it is active in odd combinations!
                 num_of_combinations = 1 << len(front)
                 for i in range(1, 1 + num_of_combinations):
                     new_breeze = set()
@@ -363,48 +365,47 @@ def calculate_probabilities(test_case):
                         legal_combinations.append(i)
 
                 # calculate the cumulative probability
-                p_active = 1.0
-                p_inactive = 1.0
+                p_active = 0.0
+                p_inactive = 0.0
                 for combination in legal_combinations:
-                    for cell in front.cells_in_front:
-                        # don't add the current cell's probability
-                        if cell == current_cell:
-                            continue
-                        if combination & cell_to_binary_position_mapping[cell]:
-                            if not combination % 2:
-                                # active
-                                p_active = p_active * test_case.probabilities[cell.get_coordinates()]
-                            else:
-                                p_inactive = p_inactive * test_case.probabilities[cell.get_coordinates()]
+                    if combination & cell_to_binary_position_mapping[current_cell]:
+                        p = 1.0
+                        for cell in front.cells_in_front:
+                            # don't add the current cell's probability
+                            if cell == current_cell:
+                                continue
+
+                            prob = TestCase.probability
+                            to_mult = prob if combination & cell_to_binary_position_mapping[cell] else 1-prob
+                            p = p * to_mult
+                        p_active = p_active + p
+                    else:
+                        p = 1.0
+                        for cell in front.cells_in_front:
+                            # don't add the current cell's probability
+                            if cell == current_cell:
+                                continue
+
+                            prob = TestCase.probability
+                            to_mult = prob if combination & cell_to_binary_position_mapping[cell] else 1 - prob
+                            p = p * to_mult
+                        p_inactive = p_inactive + p
+
+                p_active = p_active * TestCase.probability
+                p_inactive = p_inactive * (1 - TestCase.probability)
+
                 norm = 1.0 / (p_active + p_inactive)
-                test_case.probabilities[row, column] = norm*p_active*TestCase.probability
-                print(p_active, p_inactive, norm*p_active, norm*p_inactive)
-    return
-    row = 0
-    col = 0
-    row = row + 1
-    col = col + 1
-    front = Front([])
-    test_case.during_check = np.zeros(test_case.size, dtype=bool)
-    find_front(row - 1, col - 1, front, test_case, (-1, (-1, -1)))
+                test_case.probabilities[row, column] = norm * p_active
 
-    # display front
-    if not optilio_mode:
-        display_front(row - 1, col - 1, front, test_case)
-
-
-
-    return
-
-    if optilio_mode:
-        for row in range(test_case.probabilities.shape[0]):
-            for column in range(test_case.probabilities.shape[1]):
-                print(test_case.probabilities[row, column], end=' ')
-            print()
+                np.set_printoptions(precision=2, floatmode='fixed')
+                if optilio_mode:
+                    for row in range(test_case.probabilities.shape[0]):
+                        for column in range(test_case.probabilities.shape[1]):
+                            print( format(test_case.probabilities[row, column], ".2f"), end=' ')
+                        print()
 
 
 filename = 'file'  # 2019_00_small
-
 
 def main():
     tests = []
@@ -416,18 +417,18 @@ def main():
     if optilio_mode:
         [calculate_probabilities(test_case) for test_case in tests]
     else:
-        test_case = tests[0]
+
         # print(test_case.data[1:-1, 1:-1])
-        calculate_probabilities(test_case)
+        for test_case in tests:
+            calculate_probabilities(test_case)
 
-        print('{}summary{}'.format('-' * 10, '-' * 10))
-        print(test_case.visited)
-        print(test_case.probabilities)
-        print()
-        print(test_case.ground_truth)
-        print()
-        test_case.check_differences()
-
+            print('{}summary{}'.format('-' * 10, '-' * 10))
+            print(test_case.visited)
+            print(test_case.probabilities)
+            print()
+            print(test_case.ground_truth)
+            print()
+            test_case.check_differences()
 
 if __name__ == "__main__":
     main()
