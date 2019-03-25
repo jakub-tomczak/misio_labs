@@ -77,7 +77,7 @@ class CellInFront(object):
         return 'row:{} col:{}, breezes{}'.format(self.row, self.col, self.breezes_in_neighborhood)
 
     def __hash__(self):
-        return (self.row * self.col + len(self.breezes_in_neighborhood))
+        return self.row * self.col + len(self.breezes_in_neighborhood)
 
     def __eq__(self, other):
         if not isinstance(other, CellInFront):
@@ -90,7 +90,6 @@ class CellInFront(object):
 
 
 class TestCase:
-    probability = 0.0
 
     # test_case.size is a real size of the input data
     # test_case.data_matrix_size may be equal to test_case.size or may have 1 cell offset
@@ -103,12 +102,14 @@ class TestCase:
         self.raw_data = None
         self.optilio_mode = optilio_mode
         self.probabilities = None
+        self.probability = 0.0
         self.visited = None
         self.extended_data_matrix = False
         self.ground_truth = None
         self.width = 0
         self.height = 0
         self.during_check = None
+        self.instance_count = 0
 
     def parse_test_case(self, lines, extended):
         if extended:
@@ -147,19 +148,23 @@ def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
     out_path = '{}/{}/{}.out'.format(os.getcwd(), dir, filename)
 
     test_cases = []
+    count = 0
     with open(in_path, 'r') as file:
         no_test_cases = int(file.readline())
         debug_print("file {}, test cases: {}".format(in_path, no_test_cases))
         for _ in range(no_test_cases):
             size = tuple([int(x) for x in file.readline().split(' ')])
             # read probability for the current test case
-            TestCase.probability = float(file.readline())
             # read all lines for the current problem
+            probability = float(file.readline())
             lines = [file.readline() for _ in range(size[0])]
             case = TestCase(optilio_mode)
+            case.probability = probability
             case.size = size
             case.parse_test_case(lines, extended_data_matrix)
+            case.instance_count = count
             test_cases.append(case)
+            count = count + 1
 
     try:
         with open(out_path, 'r') as file:
@@ -177,14 +182,18 @@ def parse_test_data_from_input(optilio_mode, extended_data_matrix):
     test_cases = []
     debug_print('stdin, no of test cases {}'.format(no_test_cases))
 
+    count = 0
     for _ in range(no_test_cases):
         size = tuple([int(x) for x in input().split(' ')])
-        TestCase.probability = float(input())
+        probability = float(input())
         lines = [input() for _ in range(size[0])]
         case = TestCase(optilio_mode)
         case.size = size
+        case.probability = probability
         case.parse_test_case(lines, extended_data_matrix)
+        case.instance_count = count
         test_cases.append(case)
+        count = count + 1
 
     return test_cases
 
@@ -227,6 +236,10 @@ def find_front(row, col, front, test_case, previous):
 
     if test_case.raw_data[row, col] == state_to_num_mapping['?'] and previous_sym == state_to_num_mapping['?']:
         debug_print('{} {} i am the second ? in a row'.format(row, col))
+        return
+
+    if previous_sym == test_case.raw_data[row, col]:
+        debug_print('{} {} the same symbol in the row'.format(row, col))
         return
 
     if num_to_state_mapping[previous_sym] == 'B' and test_case.raw_data[row, col] == state_to_num_mapping['?']:
@@ -375,7 +388,7 @@ def calculate_probabilities(test_case):
                             if cell == current_cell:
                                 continue
 
-                            prob = TestCase.probability
+                            prob = test_case.probability
                             to_mult = prob if combination & cell_to_binary_position_mapping[cell] else 1-prob
                             p = p * to_mult
                         p_active = p_active + p
@@ -386,26 +399,25 @@ def calculate_probabilities(test_case):
                             if cell == current_cell:
                                 continue
 
-                            prob = TestCase.probability
+                            prob = test_case.probability
                             to_mult = prob if combination & cell_to_binary_position_mapping[cell] else 1 - prob
                             p = p * to_mult
                         p_inactive = p_inactive + p
 
-                p_active = p_active * TestCase.probability
-                p_inactive = p_inactive * (1 - TestCase.probability)
+                p_active = p_active * test_case.probability
+                p_inactive = p_inactive * (1 - test_case.probability)
 
                 norm = 1.0 / (p_active + p_inactive)
                 test_case.probabilities[row, column] = norm * p_active
 
-                np.set_printoptions(precision=2, floatmode='fixed')
-                if optilio_mode:
-                    for row in range(test_case.probabilities.shape[0]):
-                        for column in range(test_case.probabilities.shape[1]):
-                            print( format(test_case.probabilities[row, column], ".2f"), end=' ')
-                        print()
+    if optilio_mode:
+        for row_inner in range(test_case.probabilities.shape[0]):
+            for column_inner in range(test_case.probabilities.shape[1]):
+                print( format(test_case.probabilities[row_inner, column_inner], ".2f"), end=' ')
+            print()
 
 
-filename = 'file'  # 2019_00_small
+filename = '2019_00_small'  # 2019_00_small
 
 def main():
     tests = []
@@ -417,18 +429,27 @@ def main():
     if optilio_mode:
         [calculate_probabilities(test_case) for test_case in tests]
     else:
+        test_case = tests[8]
+        calculate_probabilities(test_case)
 
+        print('{}summary{}'.format('-' * 10, '-' * 10))
+        print(test_case.visited)
+        print(test_case.probabilities)
+        print()
+        print(test_case.ground_truth)
+        print()
+        test_case.check_differences()
         # print(test_case.data[1:-1, 1:-1])
-        for test_case in tests:
-            calculate_probabilities(test_case)
-
-            print('{}summary{}'.format('-' * 10, '-' * 10))
-            print(test_case.visited)
-            print(test_case.probabilities)
-            print()
-            print(test_case.ground_truth)
-            print()
-            test_case.check_differences()
+        # for test_case in tests:
+        #     calculate_probabilities(test_case)
+        #
+        #     print('{}summary{}'.format('-' * 10, '-' * 10))
+        #     print(test_case.visited)
+        #     print(test_case.probabilities)
+        #     print()
+        #     print(test_case.ground_truth)
+        #     print()
+        #     test_case.check_differences()
 
 if __name__ == "__main__":
     main()
