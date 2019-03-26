@@ -1,13 +1,12 @@
-from aima3.agents import *
-from misio.aima import *
-import numpy as np
+from collections import Counter
 import numpy as np
 
-optilio_mode = True
+optilio_mode = False
+display_front_enabled = False
+debug_print_enabled = False
 dir = 'test_cases'
 
 np.set_printoptions(precision=2)
-
 
 # O has value of 5 to distinguish form a sum of 4 B
 state_to_num_mapping = {
@@ -27,11 +26,13 @@ neighbors_coordinates = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
 
 def debug_print(text):
-    if not optilio_mode:
+    if debug_print_enabled and not optilio_mode:
         print(text)
 
 
 def display_front(row, col, front, test_case):
+    if not display_front_enabled:
+        return
     np.set_printoptions(precision=0, floatmode='fixed')
     print("{}front for row:{} col:{}{}".format('*' * 15, row, col, '*' * 15))
     front_n = np.zeros(test_case.size)
@@ -47,25 +48,36 @@ def display_front(row, col, front, test_case):
 
 
 class Front:
-    def __init__(self, cells):
-        self.cells_in_front = cells
-        self.cells_in_front_set = set(cells)
+    def __init__(self):
+        self.cells_in_front = []
         self.breezes = set()
-        for cell in self.cells_in_front:
-            self.breezes |= cell.breezes_in_neighborhood
-
-    def __len__(self):
-        return len(self.cells_in_front)
+        self.breezes_l = []
+        self.breezes_list = []
+        self.counted_breezes = None
+        self.one_cell_breezes = None
 
     # add cell with all its breezes,
     # merge the existing breezes set with cell's breezes
     def add_cell(self, cell):
         self.cells_in_front.append(cell)
         self.breezes |= cell.breezes_in_neighborhood
+        for breeze in cell.breezes_in_neighborhood:
+            self.breezes_list.append(breeze)
 
-    def get_breezes(self):
-        return self.breezes
+    def count_breezes(self):
+        if self.counted_breezes is None:
+            self.counted_breezes = Counter(self.breezes_list)
+        return self.counted_breezes
 
+    def find_one_cell_breezes(self):
+        if self.breezes_list is None:
+            self.counted_breezes()
+        if self.one_cell_breezes is None:
+            breezes = Counter(self.breezes_list)
+            self.one_cell_breezes = set([x for x, y in breezes.items() if y == 1])
+
+    def add_breeze(self, breeze):
+        self.breezes_l.append(breeze)
 
 class CellInFront(object):
     def __init__(self, row, col):
@@ -136,10 +148,11 @@ class TestCase:
         self.during_check = np.zeros(self.size, dtype=bool)
 
     def check_differences(self):
-        try:
-            print(self.ground_truth - self.probabilities)
-        except:
-            pass
+        if type(self.ground_truth) is not np.ndarray:
+            debug_print("Error")
+            return np.ones(self.probabilities.shape)
+        else:
+            return self.ground_truth - self.probabilities
 
 
 def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
@@ -222,43 +235,40 @@ def are_coords_the_same(coords1, coords2):
 def find_front(row, col, front, test_case, previous):
     previous_sym, previous_coords = previous
     debug_print("find_front: y:{}, x:{}, what? {}, current front: {}, previous? {}"\
-                .format(row, col,num_to_state_mapping[test_case.raw_data[row, col]], front, previous))
+                .format(row, col, num_to_state_mapping[test_case.raw_data[row, col]], front, previous))
 
-    if test_case.during_check[row, col]:
-        debug_print('{}, {} is already during checking'.format(row, col))
-        return
-    test_case.during_check[row, col] = True
-    if test_case.visited[row, col] and (
-                    test_case.raw_data[row, col] == state_to_num_mapping['O'] or test_case.raw_data[row, col] ==
-                state_to_num_mapping['?']):
-        debug_print('{}, {} is visited and is O or ?'.format(row, col))
-        return
-
-    if test_case.raw_data[row, col] == state_to_num_mapping['?'] and previous_sym == state_to_num_mapping['?']:
-        debug_print('{} {} i am the second ? in a row'.format(row, col))
-        return
-
-    if previous_sym == test_case.raw_data[row, col]:
+    if previous_sym == test_case.raw_data[row, col] or test_case.raw_data[row, col] == state_to_num_mapping['O']:
         debug_print('{} {} the same symbol in the row'.format(row, col))
         return
 
-    if num_to_state_mapping[previous_sym] == 'B' and test_case.raw_data[row, col] == state_to_num_mapping['?']:
+    if test_case.during_check[row, col]:
+        debug_print('{} {} already during check'.format(row, col))
+
+    test_case.during_check[row, col] = True
+    if test_case.raw_data[row, col] == state_to_num_mapping['B']:
+        front.add_breeze((row, col))
+
+    if num_to_state_mapping[previous_sym] == 'B' and \
+            test_case.raw_data[row, col] == state_to_num_mapping['?']:
         # came from 'B' and i am '?'
         debug_print('{}, {} i am ?, you came from B, I should be in the front'.format(row, col))
-        front.add_cell(element_to_front(row, col, test_case))
+        if not test_case.visited[row, col]:
+            front.add_cell(element_to_front(row, col, test_case))
+        else:
+            print("I could not be added {} {}".format(row, col))
 
     next_previous = (test_case.raw_data[row, col], (row, col))
     # go left
-    if col - 1 >= 0 and not are_coords_the_same(coords1=(row, col - 1), coords2=previous_coords):
+    if col - 1 >= 0 and not test_case.during_check[row, col-1]:
         find_front(row, col - 1, front, test_case, next_previous)
     # go right
-    if col + 1 < test_case.width and not are_coords_the_same(coords1=(row, col + 1), coords2=previous_coords):
+    if col + 1 < test_case.width and not test_case.during_check[row, col+1]:
         find_front(row, col + 1, front, test_case, next_previous)
     # go up
-    if row - 1 >= 0 and not are_coords_the_same(coords1=(row - 1, col), coords2=previous_coords):
+    if row - 1 >= 0 and not test_case.during_check[row-1, col]:
         find_front(row - 1, col, front, test_case, next_previous)
     # go down
-    if row + 1 < test_case.height and not are_coords_the_same(coords1=(row + 1, col), coords2=previous_coords):
+    if row + 1 < test_case.height and not test_case.during_check[row+1, col]:
         find_front(row + 1, col, front, test_case, next_previous)
 
 
@@ -309,6 +319,7 @@ def preprocessing(test_case):
                     if 0 < row + coords[0] < test_case.data_matrix_size[0] - 1 \
                             and 0 < column + coords[1] < test_case.data_matrix_size[1] - 1 \
                             and test_case.data[row + coords[0], column + coords[1]] == state_to_num_mapping['?']:
+                        debug_print('Setting to 1 {} {}'.format(row + coords[0] - 1, column + coords[1] - 1))
                         test_case.visited[row + coords[0] - 1, column + coords[1] - 1] = True
                         test_case.probabilities[row + coords[0] - 1, column + coords[1] - 1] = 1.0
 
@@ -329,24 +340,34 @@ def calculate_probabilities(test_case):
             if current_cell.get_coordinates() not in cell_to_front:
                 # find a front
                 # add the current cell to its front
-                front = Front([current_cell])
+                front = Front()
+                front.add_cell(current_cell)
                 creating_front = creating_front + 1
                 test_case.during_check = np.zeros(test_case.size, dtype=bool)
                 find_front(row, column, front, test_case, (-1, (-1, -1)))
 
+                front.find_one_cell_breezes()
+
                 for cell in front.cells_in_front:
                     cell_to_front[cell] = front
+                    breezes_with_one_cell_in_this_cell = cell.breezes_in_neighborhood.intersection(front.one_cell_breezes)
+                    if len(breezes_with_one_cell_in_this_cell) > 0  and not test_case.visited[cell.row, cell.col]\
+                            and test_case.raw_data[cell.row, cell.col] == state_to_num_mapping['?']:
+                        # cell is surrounded by a breeze with one cell
+                        print('certain cell {} {}'.format(cell.row, cell.col))
+                        test_case.probabilities[cell.row, cell.col] = 1.0
+                        test_case.visited[cell.row, cell.col] = True
 
             if not test_case.visited[row, column]:
-                # set probability == 1 to all '?' without front and with 'B' as neighbor
-                neighbors_sum = test_case.data[row, column + 1] + test_case.data[row + 1, column] + \
-                                test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
-                # if neighbors_sum is between 0 and 5 it means that there is at least one B
-                # if front is empty and there is at least one B it means that this cell must be a hole
-                if len(front) == 1 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
-                    test_case.probabilities[row, column] = 1.0
-                    test_case.visited[row, column] = True
-                    continue
+                # # set probability == 1 to all '?' without front and with 'B' as neighbor
+                # neighbors_sum = test_case.data[row, column + 1] + test_case.data[row + 1, column] + \
+                #                 test_case.data[row + 1, column + 2] + test_case.data[row + 2, column + 1]
+                # # if neighbors_sum is between 0 and 5 it means that there is at least one B
+                # # if front is empty and there is at least one B it means that this cell must be a hole
+                # if len(front.breezes) == 0 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
+                #     test_case.probabilities[row, column] = 1.0
+                #     test_case.visited[row, column] = True
+                #     continue
 
                 # display front
                 if not optilio_mode:
@@ -355,7 +376,7 @@ def calculate_probabilities(test_case):
                 # create mapping from ? to a position in a binary number
                 cell_to_binary_position_mapping = dict()
                 reversed_cell_to_binary_position_mapping = dict()
-                for cell, o in zip(front.cells_in_front, range(len(front))):
+                for cell, o in zip(front.cells_in_front, range(len(front.cells_in_front))):
                     debug_print(
                         '{}, {}: {},\tbreezes {}'.format(cell.row, cell.col, 1 << o, cell.breezes_in_neighborhood))
                     cell_to_binary_position_mapping[cell] = 1 << o
@@ -363,7 +384,7 @@ def calculate_probabilities(test_case):
 
                 # find all legal combinations
                 legal_combinations = []
-                num_of_combinations = 1 << len(front)
+                num_of_combinations = 1 << len(front.cells_in_front)
                 for i in range(1, 1 + num_of_combinations):
                     new_breeze = set()
                     for f in front.cells_in_front:
@@ -373,8 +394,8 @@ def calculate_probabilities(test_case):
                     # all breezes have at least one active ? field around -> get as much as possible
                     # which means that we always find all possibilities
                     # TODO check whether it is possible to take only the minimal subset of cells to combination
-                    if len(new_breeze) == len(front.get_breezes()):
-                        debug_print("legal combination is {}".format(i))
+                    if len(new_breeze) == len(front.breezes):
+                        # debug_print("legal combination is {}".format(i))
                         legal_combinations.append(i)
 
                 # calculate the cumulative probability
@@ -417,7 +438,7 @@ def calculate_probabilities(test_case):
             print()
 
 
-filename = '2019_00_small'  # 2019_00_small
+filename = '3'  # 2019_00_small
 
 def main():
     tests = []
@@ -433,23 +454,19 @@ def main():
         calculate_probabilities(test_case)
 
         print('{}summary{}'.format('-' * 10, '-' * 10))
-        print(test_case.visited)
-        print(test_case.probabilities)
-        print()
-        print(test_case.ground_truth)
-        print()
-        test_case.check_differences()
-        # print(test_case.data[1:-1, 1:-1])
-        # for test_case in tests:
-        #     calculate_probabilities(test_case)
-        #
-        #     print('{}summary{}'.format('-' * 10, '-' * 10))
-        #     print(test_case.visited)
-        #     print(test_case.probabilities)
-        #     print()
-        #     print(test_case.ground_truth)
-        #     print()
-        #     test_case.check_differences()
+
+        diff = abs(np.mean(test_case.check_differences()))
+        if diff < 0.0001:
+            print('instance {} OK'.format(test_case.instance_count))
+        else:
+            print(print('instance {} NOT OK, diff = {}'.format(test_case.instance_count, diff)))
+            print(test_case.visited)
+            print(test_case.probabilities)
+            print()
+            print(test_case.ground_truth)
+            print()
+            print(test_case.check_differences())
+
 
 if __name__ == "__main__":
     main()
