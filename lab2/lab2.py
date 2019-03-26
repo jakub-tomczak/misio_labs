@@ -1,7 +1,8 @@
+import sys
 from collections import Counter
 import numpy as np
 
-optilio_mode = False
+optilio_mode = True
 display_front_enabled = False
 debug_print_enabled = False
 dir = 'test_cases'
@@ -122,6 +123,7 @@ class TestCase:
         self.height = 0
         self.during_check = None
         self.instance_count = 0
+        self.certain = None
 
     def parse_test_case(self, lines, extended):
         if extended:
@@ -143,6 +145,7 @@ class TestCase:
         self.visited = np.zeros(self.size, dtype=bool)
         self.width = self.size[1]
         self.height = self.size[0]
+        self.certain = np.zeros(self.size)
 
     def clear_during_check(self):
         self.during_check = np.zeros(self.size, dtype=bool)
@@ -182,8 +185,7 @@ def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
     try:
         with open(out_path, 'r') as file:
             for case in test_cases:
-                case.ground_truth = np.array(
-                    [[float(x) for x in file.readline().split(' ')] for _ in range(case.size[0])])
+                case.ground_truth = np.array([[float(x) for x in file.readline().split(' ') if x != '\n'] for _ in range(case.size[0])])
     except:
         pass
 
@@ -255,7 +257,7 @@ def find_front(row, col, front, test_case, previous):
         if not test_case.visited[row, col]:
             front.add_cell(element_to_front(row, col, test_case))
         else:
-            print("I could not be added {} {}".format(row, col))
+            pass #print("I could not be added {} {}".format(row, col))
 
     next_previous = (test_case.raw_data[row, col], (row, col))
     # go left
@@ -304,24 +306,24 @@ def preprocessing(test_case):
             sum_around = test_case.data[row - 1, column] + test_case.data[row, column + 1] + \
                          test_case.data[row, column - 1] + test_case.data[row + 1, column]
 
-            corner_penalty = (0 if 0 < (row - 1) else 1) + (0 if row + 2 < test_case.data_matrix_size[0] else 1) + \
-                             (0 if 0 < (column - 1) else 1) + (0 if column + 2 < test_case.data_matrix_size[1] else 1)
+            # corner_penalty = (0 if 0 < (row - 1) else 1) + (0 if row + 2 < test_case.data_matrix_size[0] else 1) + \
+            #                  (0 if 0 < (column - 1) else 1) + (0 if column + 2 < test_case.data_matrix_size[1] else 1)
             # too distant `?`
             if test_case.data[row, column] == state_to_num_mapping['?'] and sum_around == 0:
 
                 # around `?` there are only `?`
                 test_case.visited[row - 1, column - 1] = True
 
-            elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == (3 - corner_penalty) * \
-                    state_to_num_mapping[
-                        'O']:
-                for coords in neighbors_coordinates:
-                    if 0 < row + coords[0] < test_case.data_matrix_size[0] - 1 \
-                            and 0 < column + coords[1] < test_case.data_matrix_size[1] - 1 \
-                            and test_case.data[row + coords[0], column + coords[1]] == state_to_num_mapping['?']:
-                        debug_print('Setting to 1 {} {}'.format(row + coords[0] - 1, column + coords[1] - 1))
-                        test_case.visited[row + coords[0] - 1, column + coords[1] - 1] = True
-                        test_case.probabilities[row + coords[0] - 1, column + coords[1] - 1] = 1.0
+            # elif test_case.data[row, column] == state_to_num_mapping['B'] and sum_around == (3 - corner_penalty) * \
+            #         state_to_num_mapping[
+            #             'O']:
+            #     for coords in neighbors_coordinates:
+            #         if 0 < row + coords[0] < test_case.data_matrix_size[0] - 1 \
+            #                 and 0 < column + coords[1] < test_case.data_matrix_size[1] - 1 \
+            #                 and test_case.data[row + coords[0], column + coords[1]] == state_to_num_mapping['?']:
+            #             print('Setting to 1 {} {}'.format(row + coords[0] - 1, column + coords[1] - 1))
+            #             test_case.visited[row + coords[0] - 1, column + coords[1] - 1] = True
+            #             test_case.probabilities[row + coords[0] - 1, column + coords[1] - 1] = 1.0
 
 
 def calculate_probabilities(test_case):
@@ -331,6 +333,7 @@ def calculate_probabilities(test_case):
     # stores mapping from a CellInFront to front
     cell_to_front = dict()
     creating_front = 0
+
     for row in range(test_case.height):
         for column in range(test_case.width):
             if test_case.visited[row, column]:
@@ -351,12 +354,13 @@ def calculate_probabilities(test_case):
                 for cell in front.cells_in_front:
                     cell_to_front[cell] = front
                     breezes_with_one_cell_in_this_cell = cell.breezes_in_neighborhood.intersection(front.one_cell_breezes)
-                    if len(breezes_with_one_cell_in_this_cell) > 0  and not test_case.visited[cell.row, cell.col]\
+                    if len(breezes_with_one_cell_in_this_cell) > 0 and not test_case.visited[cell.row, cell.col]\
                             and test_case.raw_data[cell.row, cell.col] == state_to_num_mapping['?']:
                         # cell is surrounded by a breeze with one cell
-                        print('certain cell {} {}'.format(cell.row, cell.col))
-                        test_case.probabilities[cell.row, cell.col] = 1.0
-                        test_case.visited[cell.row, cell.col] = True
+                        # print('certain cell {} {}'.format(cell.row, cell.col))
+                        test_case.certain[cell.row, cell.col] = 1.0
+                        # test_case.probabilities[cell.row, cell.col] = 1.0
+                        # test_case.visited[cell.row, cell.col] = True
 
             if not test_case.visited[row, column]:
                 # # set probability == 1 to all '?' without front and with 'B' as neighbor
@@ -432,10 +436,11 @@ def calculate_probabilities(test_case):
                 test_case.probabilities[row, column] = norm * p_active
 
     if optilio_mode:
-        for row_inner in range(test_case.probabilities.shape[0]):
-            for column_inner in range(test_case.probabilities.shape[1]):
-                print( format(test_case.probabilities[row_inner, column_inner], ".2f"), end=' ')
-            print()
+        np.savetxt(sys.stdout.buffer, test_case.probabilities, delimiter=' ', fmt='%.2f')
+        # for row_inner in range(test_case.probabilities.shape[0]):
+        #     for column_inner in range(test_case.probabilities.shape[1]):
+        #         print(format(test_case.probabilities[row_inner, column_inner], ".2f"), end=' ')
+        #     print()
 
 
 filename = '3'  # 2019_00_small
@@ -450,22 +455,25 @@ def main():
     if optilio_mode:
         [calculate_probabilities(test_case) for test_case in tests]
     else:
-        test_case = tests[8]
-        calculate_probabilities(test_case)
+        for i in range(len(tests)):
+            test_case = tests[i]
+            calculate_probabilities(test_case)
 
-        print('{}summary{}'.format('-' * 10, '-' * 10))
+            print('{}summary{}'.format('-' * 10, '-' * 10))
 
-        diff = abs(np.mean(test_case.check_differences()))
-        if diff < 0.0001:
-            print('instance {} OK'.format(test_case.instance_count))
-        else:
-            print(print('instance {} NOT OK, diff = {}'.format(test_case.instance_count, diff)))
-            print(test_case.visited)
-            print(test_case.probabilities)
-            print()
-            print(test_case.ground_truth)
-            print()
-            print(test_case.check_differences())
+            diff = abs(np.mean(test_case.check_differences()))
+            if diff < 0.001:
+                print('instance {} OK'.format(test_case.instance_count))
+            else:
+                print(print('instance {} NOT OK, diff = {}'.format(test_case.instance_count, diff)))
+                print(test_case.visited)
+                print(test_case.probabilities)
+                print()
+                print(test_case.ground_truth)
+                print()
+                print(test_case.check_differences())
+                print()
+                print(test_case.certain)
 
 
 if __name__ == "__main__":
