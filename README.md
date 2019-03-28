@@ -33,7 +33,7 @@ pip3 install git+https://github.com/mihahauke/misio_labs --user
 * attendance is mandatory (as per Uni code); in case of any doubts about scoring/cheating lack of attendance may result in disadvantageous consideration
 * a solution has to be submited before a start of the next class; every started week of delay results in -20% penalty (sometimes you'll have 2 weeks for a task)
 * sharing your code or solutions is prohibited (you may however share your thoughts and ideas)
-* submitting someone else's code will result in grade **2/2** and any legal repercussions available
+* submitting someone else's solutions will result in grade **2/2** and any legal repercussions available
 
 # [Lab1 Intelligent agents](lab1) (10 pts)
 Introduction to artificial intelligence basics: agents, environments, rationality etc. 
@@ -42,9 +42,12 @@ This task uses python's [aima3](https://github.com/Calysto/aima3) library for AI
 # [Lab2 Uncertain Wumpus](lab2) (15pts)
 Practical example of uncertainty in Artificial Intelligence.
 
-# [Lab3 ](lab3)
+# [Lab3 Lost Wumpus](lab3) (15pts)
+Using histogram filter for navigation.
 
-# [Lab4-5 Lost Wumpus](lab4) (15pts)
+# [Lab4-5 ](lab4)
+?
+
 TODO
 # [Lab 6 MCTS](lab6) (15pts)
 Monte Carlo Tree Search
