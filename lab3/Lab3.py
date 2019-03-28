@@ -73,7 +73,6 @@ def parse_test_data(dir, filename, optilio_mode, extended_data_matrix):
             # pj pn
             # y x
             probability = float(read_method())
-            print("probability is ",probability)
             pj_pn = tuple([float(x) for x in read_method().split(' ')])
             size = tuple([int(x) for x in read_method().split(' ')])
             lines = [read_method() for _ in range(size[0])]
@@ -107,7 +106,6 @@ def main():
         for i in range(len(tests)):
             test_case = tests[i]
             find_exit(test_case)
-    print(tests[0].raw_data)
 
 if __name__ == "__main__":
     main()
