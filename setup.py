@@ -3,13 +3,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='misio',
-    version='0.0.4',
+    version='0.0.7',
     description="Package for MISiO course at PUT",
     long_description="Package for MISiO course at PUT",
     author='Michał Kempka',
     author_email='mkempka@cs.put.poznan.pl',
     packages=find_packages(),
-    install_requires=['numpy', 'aima3'],
+    install_requires=['numpy', 'aima3','scikit-learn','scipy'],
     # package_data={'misio': []},
     classifiers=[
         # Development Status :: 1 - Planning
