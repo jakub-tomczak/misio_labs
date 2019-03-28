@@ -2,7 +2,7 @@ import sys
 from collections import Counter
 import numpy as np
 
-optilio_mode = True
+optilio_mode = False
 display_front_enabled = False
 debug_print_enabled = False
 dir = 'test_cases'
@@ -25,6 +25,13 @@ num_to_state_mapping = {
 # [north, east, south, west]
 neighbors_coordinates = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
+from time import time
+preprocessing_time = 0.0
+calc_time = 0.0
+front_find_time = 0.0
+calc_probability_time = 0.0
+print_time = 0.0
+one_part_calc_time = 0.0
 
 def debug_print(text):
     if debug_print_enabled and not optilio_mode:
@@ -279,6 +286,8 @@ def find_front(row, col, front, test_case, previous):
 #   - ? cell is surrounded by ?
 #   - B cell is surrounded by 3 x O and 1 x ?
 def preprocessing(test_case):
+    global preprocessing_time
+    start = time()
     # clear all fields with B or O
     mask = test_case.raw_data > 0
     test_case.probabilities[mask] = 0
@@ -324,10 +333,13 @@ def preprocessing(test_case):
             #             print('Setting to 1 {} {}'.format(row + coords[0] - 1, column + coords[1] - 1))
             #             test_case.visited[row + coords[0] - 1, column + coords[1] - 1] = True
             #             test_case.probabilities[row + coords[0] - 1, column + coords[1] - 1] = 1.0
+    preprocessing_time = preprocessing_time + time() - start
 
 
 def calculate_probabilities(test_case):
+    global calc_time, front_find_time, calc_probability_time, print_time, one_part_calc_time
     preprocessing(test_case)
+    calc_start = time()
     debug_print(test_case.visited)
 
     # stores mapping from a CellInFront to front
@@ -343,6 +355,7 @@ def calculate_probabilities(test_case):
             if current_cell.get_coordinates() not in cell_to_front:
                 # find a front
                 # add the current cell to its front
+                find_front_start = time()
                 front = Front()
                 front.add_cell(current_cell)
                 creating_front = creating_front + 1
@@ -351,14 +364,16 @@ def calculate_probabilities(test_case):
 
                 front.find_one_cell_breezes()
 
+                front_find_time = front_find_time + time() - find_front_start
+
                 for cell in front.cells_in_front:
                     cell_to_front[cell] = front
-                    breezes_with_one_cell_in_this_cell = cell.breezes_in_neighborhood.intersection(front.one_cell_breezes)
-                    if len(breezes_with_one_cell_in_this_cell) > 0 and not test_case.visited[cell.row, cell.col]\
-                            and test_case.raw_data[cell.row, cell.col] == state_to_num_mapping['?']:
-                        # cell is surrounded by a breeze with one cell
-                        # print('certain cell {} {}'.format(cell.row, cell.col))
-                        test_case.certain[cell.row, cell.col] = 1.0
+                    # breezes_with_one_cell_in_this_cell = cell.breezes_in_neighborhood.intersection(front.one_cell_breezes)
+                    # if len(breezes_with_one_cell_in_this_cell) > 0 and not test_case.visited[cell.row, cell.col]\
+                    #         and test_case.raw_data[cell.row, cell.col] == state_to_num_mapping['?']:
+                    #     # cell is surrounded by a breeze with one cell
+                    #     # print('certain cell {} {}'.format(cell.row, cell.col))
+                    #     test_case.certain[cell.row, cell.col] = 1.0
                         # test_case.probabilities[cell.row, cell.col] = 1.0
                         # test_case.visited[cell.row, cell.col] = True
 
@@ -371,12 +386,14 @@ def calculate_probabilities(test_case):
                 # if len(front.breezes) == 0 and state_to_num_mapping['?'] < neighbors_sum < state_to_num_mapping['O']:
                 #     test_case.probabilities[row, column] = 1.0
                 #     test_case.visited[row, column] = True
+                #     print("setting-------------------------")
                 #     continue
 
                 # display front
                 if not optilio_mode:
                    display_front(row, column, front, test_case)
 
+                just_calc_start = time()
                 # create mapping from ? to a position in a binary number
                 cell_to_binary_position_mapping = dict()
                 reversed_cell_to_binary_position_mapping = dict()
@@ -402,6 +419,7 @@ def calculate_probabilities(test_case):
                         # debug_print("legal combination is {}".format(i))
                         legal_combinations.append(i)
 
+                one_part_calc_time = one_part_calc_time + time() - just_calc_start
                 # calculate the cumulative probability
                 p_active = 0.0
                 p_inactive = 0.0
@@ -435,13 +453,17 @@ def calculate_probabilities(test_case):
                 norm = 1.0 / (p_active + p_inactive)
                 test_case.probabilities[row, column] = norm * p_active
 
+                calc_time = calc_time + time() - just_calc_start
+    calc_probability_time = calc_probability_time + time() - calc_start
+
+    print_start = time()
     if optilio_mode:
         np.savetxt(sys.stdout.buffer, test_case.probabilities, delimiter=' ', fmt='%.2f')
         # for row_inner in range(test_case.probabilities.shape[0]):
         #     for column_inner in range(test_case.probabilities.shape[1]):
         #         print(format(test_case.probabilities[row_inner, column_inner], ".2f"), end=' ')
         #     print()
-
+    print_time = print_time + time() - print_start
 
 filename = '3'  # 2019_00_small
 
@@ -478,3 +500,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print('Preprocessing time {}\nCalc probabilities time {}\n\tFind front time {}\n\tOne part {}\n\tCalc time {}\n\tPrint time {}'.format(preprocessing_time, calc_probability_time, front_find_time, one_part_calc_time, calc_time, print_time))
