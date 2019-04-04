@@ -94,33 +94,27 @@ class MyAgent(AgentStub):
 
     def move(self):
         self.move_counter += 1
-        take_max_value_as_next_step = True
         # argmax returns coordinates in one-dimensional array format
         best_place = np.unravel_index(self.histogram.argmax(), self.histogram.shape)
 
         chosen_direction = None
 
-        if take_max_value_as_next_step:
-            highest_p = 0.0
-            next_move = (0,0)
+        highest_p = 0.0
+        next_move = (0,0)
 
-            # for all neighbours
-            for neighbour_direction in Action:
-                neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
-                # find the one with the highest probability
-                if self.histogram[neighbour_position] > highest_p:
-                    highest_p = self.histogram[neighbour_position]
-                    next_move = neighbour_position
-                    chosen_direction = neighbour_direction
-        else:
-            y_diff, y_direction = cyclic_distance(best_place[0], self.exit_location[0], self.h, (Action.UP, Action.DOWN))
-            x_diff, x_direction = cyclic_distance(best_place[1], self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-            chosen_direction = y_direction if y_diff < x_diff else x_direction
-
+        # for all neighbours
+        for neighbour_direction in Action:
+            neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
+            # find the one with the highest probability
+            if self.histogram[neighbour_position] > highest_p:
+                highest_p = self.histogram[neighbour_position]
+                next_move = neighbour_position
+                chosen_direction = neighbour_direction
+        
         self.histogram = convolve2d(self.histogram, self.masks[chosen_direction], 'same', "wrap")
         self.histogram /= self.histogram.max()
         # print("y:{}, {}; x:{} {}".format(y_diff, y_direction, x_diff, x_direction))
-        debug_print("using max method? {}, decision is {}".format(take_max_value_as_next_step, chosen_direction))
+        debug_print("decision is {}".format(chosen_direction))
         debug_print("{}".format('-'*20))
 
         self.plot_location()
