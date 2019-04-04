@@ -7,7 +7,7 @@ from misio.lost_wumpus._wumpus import Action, Field
 
 import numpy as np
 
-optilio_mode = True
+optilio_mode = False
 debug_mode = False
 draw_histogram = False
 plot_pause_seconds = 1
@@ -31,7 +31,7 @@ def safe_position(x: int, boundary: int) -> int:
 # after performing action from field current_position
 def cyclic_position(current_position: (int, int), action: Action, boundary: (int, int)) -> (int, int):
     h, w = boundary
-    x, y = current_position
+    y, x = current_position
     if action == Action.DOWN:
         y = safe_position(y+1, h)
     elif action == Action.UP:
@@ -40,7 +40,7 @@ def cyclic_position(current_position: (int, int), action: Action, boundary: (int
         x = safe_position(x+1, w)
     else:
         x = safe_position(x-1, w)
-    return x, y
+    return y, x
 
 # example: x = 1, y = 4, boundary = 5, options (Action.Left, Action.Right)
 # should return (2, Action.Left)
@@ -61,7 +61,7 @@ def create_convolution_masks(p1, p2):
          [0, p2, 0],
         [p2, p1, p2],
          [0, p2, 0]
-    ], dtype='float')
+    ])
     mask_right = np.rot90(mask_down, 1)
     mask_up = np.rot90(mask_right, 1)
     mask_left = np.rot90(mask_up, 1)
@@ -72,6 +72,20 @@ def create_convolution_masks(p1, p2):
             Action.UP: mask_up
     }
 
+
+class Move:
+    def __init__(self, location, dy, dx, p, dir):
+        self.location = location
+        self.dy = dy
+        self.dx = dx
+        self.p = p
+        self.dir = dir
+
+    def coefficient(self, h, w):
+        return self.p**2
+        # return self.p * (h - self.location[0] + w - self.location[1])
+
+
 class MyAgent(AgentStub):
     def __init__(self, *args, **kwargs):
         super(MyAgent, self).__init__(*args, **kwargs)
@@ -79,6 +93,24 @@ class MyAgent(AgentStub):
         self.entered_cave_mask = np.where(self.map == Field.CAVE, self.pj, self.pn)
         self.entered_not_cave_mask = np.where(self.map == Field.EMPTY, self.pj, self.pn)
         self.reset()
+
+    def is_move_acceptable(self, move):
+        if self.last_move is None:
+            return True
+        if move is None:
+            return True
+        if self.last_move != move:
+            return True
+        if self.last_move == move and self.the_same_direction_counter < 2:
+            return True
+        print('Too many moves in direction {}'.format(move))
+        return False
+
+    def commit_move(self, move):
+        if self.last_move != move:
+            self.last_move = move
+        else:
+            self.the_same_direction_counter += 1
 
     def sense(self, sensory_input: bool):
         if sensory_input == Field.CAVE:
@@ -90,30 +122,47 @@ class MyAgent(AgentStub):
 
         self.histogram /= self.histogram.max()
         self.histogram[self.exit_location] = 0
-        debug_print('ok')
 
     def move(self):
         self.move_counter += 1
         # argmax returns coordinates in one-dimensional array format
         best_place = np.unravel_index(self.histogram.argmax(), self.histogram.shape)
-
         chosen_direction = None
-
         highest_p = 0.0
-        next_move = (0,0)
 
-        # for all neighbours
-        for neighbour_direction in Action:
-            neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
-            # find the one with the highest probability
-            if self.histogram[neighbour_position] > highest_p:
-                highest_p = self.histogram[neighbour_position]
-                next_move = neighbour_position
-                chosen_direction = neighbour_direction
-        
+        max_val = self.histogram.max()
+        for r, row in enumerate(self.histogram):
+            for c, _ in enumerate(row):
+                if self.histogram[r,c] > max_val * .9:
+                    # dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
+                    # dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
+                    # coeff = self.histogram[r, c]**2 * (self.h - dy + self.w - dx)
+                    # if coeff > highest_p:
+                    #     highest_p = coeff
+                    #     chosen_direction = y_direct if dy < dx else x_direct
+
+                    for neighbour_direction in Action:
+                        neigh_pos = cyclic_position((r, c), neighbour_direction, (self.h, self.w))
+                        if self.histogram[neigh_pos] > highest_p:
+                            chosen_direction = neighbour_direction
+                            highest_p = self.histogram[neigh_pos]
+
+                # for all neighbours
+                # for neighbour_direction in Action:
+                #     neighbour_position = cyclic_position(self.histogram[r, c], neighbour_direction, (self.h, self.w))
+                #     # find the one with the highest probability
+                #     # coeff = self.histogram[neighbour_position]**2 * (self.h - neighbour_position[0] + self.w - neighbour_position[1])
+                #     if coeff > highest_p and self.is_move_acceptable(chosen_direction):
+                #         highest_p = coeff
+                #         chosen_direction = neighbour_direction
+
+
+
+        # self.commit_move(chosen_direction)
+        # print('{}: {}'.format(self.move_counter, chosen_direction))
         self.histogram = convolve2d(self.histogram, self.masks[chosen_direction], 'same', "wrap")
         self.histogram /= self.histogram.max()
-        # print("y:{}, {}; x:{} {}".format(y_diff, y_direction, x_diff, x_direction))
+        
         debug_print("decision is {}".format(chosen_direction))
         debug_print("{}".format('-'*20))
 
@@ -123,12 +172,15 @@ class MyAgent(AgentStub):
 
 
     def reset(self):
-        debug_print("resetting")
+        print("resetting")
         self.histogram = np.ones_like(self.map)
         self.where_am_i = np.ones_like(self.map)
         self.holes_probabilities = np.ones_like(self.map)
         self.move_counter = 1
         self.exit_location = np.unravel_index(np.argmax(self.map), self.map.shape)
+        self.move_history = []
+        self.the_same_direction_counter = 0
+        self.last_move = None
         debug_print("exit location {}".format(self.exit_location))
 
     def plot_location(self):
@@ -140,7 +192,8 @@ class MyAgent(AgentStub):
             plt.pause(plot_pause_seconds)
 
 if __name__ == "__main__":
+    from super_agent import Wumpus
     if optilio_mode:
         run_agent(MyAgent)
     else:
-        test_locally(local_test_file, MyAgent, verbose=True, seed=1, n=10)
+        test_locally(local_test_file, SnakeAgent, verbose=True)
