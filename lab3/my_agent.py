@@ -1,5 +1,5 @@
 #!/bin/bash
-import signal
+from scipy.signal import convolve2d
 from misio.optilio.lost_wumpus import run_agent
 from misio.lost_wumpus.testing import test_locally
 from misio.lost_wumpus.agents import SnakeAgent, AgentStub
@@ -12,7 +12,14 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 
 optilio_mode = False
+debug_mode = True
 local_test_file = 'tests/one.in'
+
+
+def debug_print(text):
+    if not optilio_mode and debug_mode:
+        print(text)
+
 
 # [0,0] UP => [4,0]
 # [0,0] LEFT => [0,4]
@@ -32,7 +39,7 @@ def cyclic_position(current_position: (int, int), action: Action, boundary: (int
         x = safe_position(x+1, w)
     else:
         x = safe_position(x-1, w)
-    return (x, y)
+    return x, y
 
 # example: x = 1, y = 4, boundary = 5, options (Action.Left, Action.Right)
 # should return (2, Action.Left)
@@ -74,59 +81,68 @@ class MyAgent(AgentStub):
 
     def sense(self, sensory_input: bool):
         norm = np.sum(self.histogram)
+        norm = np.max(self.histogram)
         if sensory_input == Field.CAVE:
-            print('{} this is cave'.format(self.move_counter))
+            debug_print('{} this is cave'.format(self.move_counter))
             self.histogram *= self.entered_cave_mask
         else:
             self.histogram *= self.entered_not_cave_mask
-            print('{} this is nothing'.format(self.move_counter))
+            debug_print('{} this is nothing'.format(self.move_counter))
 
         self.histogram /= norm
         self.histogram[self.exit_location] = 0
-
-        fig, ax = plt.subplots()
-        grid = ax.imshow(self.histogram, cmap="GnBu")
-        grid.set_data(self.histogram)
-        plt.show()
-        print('ok')
+        debug_print('ok')
 
     def move(self):
         self.move_counter += 1
+        take_max_value_as_next_step = True
         # argmax returns coordinates in one-dimensional array format
         best_place = np.unravel_index(self.histogram.argmax(), self.histogram.shape)
-        highest_p = 0.0
-        next_move = (0,0)
 
-        # for all neighbours
-        for neighbour_direction in Action:
-            neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
-            # find the one with the highest probability
-            if self.histogram[neighbour_position] > highest_p:
-                highest_p = self.histogram[neighbour_position]
-                next_move = neighbour_position
+        chosen_direction = None
 
+        if take_max_value_as_next_step:
+            highest_p = 0.0
+            next_move = (0,0)
 
-        y_diff, y_direction = cyclic_distance(best_place[0], self.exit_location[0], self.h, (Action.UP, Action.DOWN))
-        x_diff, x_direction = cyclic_distance(best_place[1], self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-        target_direction = y_direction if y_diff < x_diff else x_direction
-        self.histogram = signal.convolve2d(self.histogram, self.actions_masks[target_direction], 'same', "wrap")
+            # for all neighbours
+            for neighbour_direction in Action:
+                neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
+                # find the one with the highest probability
+                if self.histogram[neighbour_position] > highest_p:
+                    highest_p = self.histogram[neighbour_position]
+                    next_move = neighbour_position
+                    chosen_direction = neighbour_direction
+        else:
+            y_diff, y_direction = cyclic_distance(best_place[0], self.exit_location[0], self.h, (Action.UP, Action.DOWN))
+            x_diff, x_direction = cyclic_distance(best_place[1], self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
+            chosen_direction = y_direction if y_diff < x_diff else x_direction
+
+        self.histogram = convolve2d(self.histogram, self.masks[chosen_direction], 'same', "wrap")
+
         # print("y:{}, {}; x:{} {}".format(y_diff, y_direction, x_diff, x_direction))
-        # print("decision is {}".format(target_direction))
-        # print("{}".format('-'*20))
+        debug_print("using max method? {}, decision is {}".format(take_max_value_as_next_step, chosen_direction))
+        debug_print("{}".format('-'*20))
 
-        return target_direction
+        return chosen_direction
 
     def get_histogram(self):
         return self.histogram
 
     def reset(self):
-        print("resetting")
+        debug_print("resetting")
         self.histogram = np.ones_like(self.map)
         self.where_am_i = np.ones_like(self.map)
         self.holes_probabilities = np.ones_like(self.map)
         self.move_counter = 1
         self.exit_location = np.unravel_index(np.argmax(self.map), self.map.shape)
-        print("exit location {}".format(self.exit_location))
+        debug_print("exit location {}".format(self.exit_location))
+
+    def plot_location(self):
+        fig, ax = plt.subplots()
+        grid = ax.imshow(self.histogram, cmap="GnBu")
+        grid.set_data(self.histogram)
+        plt.show()
 
 if __name__ == "__main__":
     if optilio_mode:
