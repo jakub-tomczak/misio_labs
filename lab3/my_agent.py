@@ -5,16 +5,17 @@ from misio.lost_wumpus.testing import test_locally
 from misio.lost_wumpus.agents import SnakeAgent, AgentStub
 from misio.lost_wumpus._wumpus import Action, Field
 
-import matplotlib.pyplot as plt
-
 import numpy as np
 
-np.set_printoptions(precision=3, suppress=True)
-
-optilio_mode = False
+optilio_mode = True
 debug_mode = True
+draw_histogram = False
+plot_pause_seconds = 1
 local_test_file = 'tests/one.in'
 
+if not optilio_mode and draw_histogram:
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
 
 def debug_print(text):
     if not optilio_mode and debug_mode:
@@ -81,7 +82,7 @@ class MyAgent(AgentStub):
 
     def sense(self, sensory_input: bool):
         norm = np.sum(self.histogram)
-        norm = np.max(self.histogram)
+        # norm = np.max(self.histogram)
         if sensory_input == Field.CAVE:
             debug_print('{} this is cave'.format(self.move_counter))
             self.histogram *= self.entered_cave_mask
@@ -124,6 +125,8 @@ class MyAgent(AgentStub):
         debug_print("using max method? {}, decision is {}".format(take_max_value_as_next_step, chosen_direction))
         debug_print("{}".format('-'*20))
 
+        self.plot_location()
+
         return chosen_direction
 
     def get_histogram(self):
@@ -139,10 +142,12 @@ class MyAgent(AgentStub):
         debug_print("exit location {}".format(self.exit_location))
 
     def plot_location(self):
-        fig, ax = plt.subplots()
-        grid = ax.imshow(self.histogram, cmap="GnBu")
-        grid.set_data(self.histogram)
-        plt.show()
+        if not optilio_mode and draw_histogram:
+            grid = ax.imshow(self.histogram, cmap="prism")
+            grid.set_data(self.histogram)
+            plt.ion()
+            plt.show()
+            plt.pause(plot_pause_seconds)
 
 if __name__ == "__main__":
     if optilio_mode:
