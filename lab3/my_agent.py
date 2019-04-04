@@ -2,13 +2,13 @@
 from scipy.signal import convolve2d
 from misio.optilio.lost_wumpus import run_agent
 from misio.lost_wumpus.testing import test_locally
-from misio.lost_wumpus.agents import SnakeAgent, AgentStub
+from misio.lost_wumpus.agents import SnakeAgent, AgentStub, RandomAgent
 from misio.lost_wumpus._wumpus import Action, Field
 
 import numpy as np
 
 optilio_mode = True
-debug_mode = True
+debug_mode = False
 draw_histogram = False
 plot_pause_seconds = 1
 local_test_file = 'tests/one.in'
@@ -81,8 +81,6 @@ class MyAgent(AgentStub):
         self.reset()
 
     def sense(self, sensory_input: bool):
-        norm = np.sum(self.histogram)
-        # norm = np.max(self.histogram)
         if sensory_input == Field.CAVE:
             debug_print('{} this is cave'.format(self.move_counter))
             self.histogram *= self.entered_cave_mask
@@ -90,7 +88,7 @@ class MyAgent(AgentStub):
             self.histogram *= self.entered_not_cave_mask
             debug_print('{} this is nothing'.format(self.move_counter))
 
-        self.histogram /= norm
+        self.histogram /= self.histogram.max()
         self.histogram[self.exit_location] = 0
         debug_print('ok')
 
@@ -120,7 +118,7 @@ class MyAgent(AgentStub):
             chosen_direction = y_direction if y_diff < x_diff else x_direction
 
         self.histogram = convolve2d(self.histogram, self.masks[chosen_direction], 'same', "wrap")
-
+        self.histogram /= self.histogram.max()
         # print("y:{}, {}; x:{} {}".format(y_diff, y_direction, x_diff, x_direction))
         debug_print("using max method? {}, decision is {}".format(take_max_value_as_next_step, chosen_direction))
         debug_print("{}".format('-'*20))
@@ -129,8 +127,6 @@ class MyAgent(AgentStub):
 
         return chosen_direction
 
-    def get_histogram(self):
-        return self.histogram
 
     def reset(self):
         debug_print("resetting")
@@ -151,6 +147,6 @@ class MyAgent(AgentStub):
 
 if __name__ == "__main__":
     if optilio_mode:
-        run_agent(SnakeAgent)
+        run_agent(MyAgent)
     else:
-        test_locally(local_test_file, MyAgent, verbose=True, seed=1, n=1)
+        test_locally(local_test_file, MyAgent, verbose=True, seed=1, n=10)
