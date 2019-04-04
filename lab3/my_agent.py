@@ -1,8 +1,12 @@
 #!/bin/bash
+import signal
 from misio.optilio.lost_wumpus import run_agent
 from misio.lost_wumpus.testing import test_locally
 from misio.lost_wumpus.agents import SnakeAgent, AgentStub
 from misio.lost_wumpus._wumpus import Action, Field
+
+import matplotlib.pyplot as plt
+
 import numpy as np
 
 np.set_printoptions(precision=3, suppress=True)
@@ -42,24 +46,49 @@ def cyclic_distance(src: int, dst: int, boundary: int, options: (Action, Action)
     else:
         return distance, options[1] if src < dst else options[0]
 
+def create_convolution_masks(p1, p2):
+    mask_down = np.array([
+         [0, 0, 0],
+         [0, 0, 0],
+         [0, p2, 0],
+        [p2, p1, p2],
+         [0, p2, 0]
+    ], dtype='float')
+    mask_right = np.rot90(mask_down, 1)
+    mask_up = np.rot90(mask_right, 1)
+    mask_left = np.rot90(mask_up, 1)
+    return {
+            Action.DOWN: mask_down,
+            Action.LEFT: mask_left,
+            Action.RIGHT: mask_right,
+            Action.UP: mask_up
+    }
 
 class MyAgent(AgentStub):
     def __init__(self, *args, **kwargs):
         super(MyAgent, self).__init__(*args, **kwargs)
+        self.masks = create_convolution_masks(self.p, (1-self.p)/4)
+        self.entered_cave_mask = np.where(self.map == Field.CAVE, self.pj, self.pn)
+        self.entered_not_cave_mask = np.where(self.map == Field.EMPTY, self.pj, self.pn)
         self.reset()
 
     def sense(self, sensory_input: bool):
-        holes_prob = np.mean(self.holes_probabilities)
+        norm = np.sum(self.histogram)
         if sensory_input == Field.CAVE:
             print('{} this is cave'.format(self.move_counter))
-            self.histogram[self.map == Field.CAVE] *= self.pj
-            self.histogram[self.map != Field.CAVE] *= self.pn            
+            self.histogram *= self.entered_cave_mask
         else:
-            self.histogram[self.map == Field.CAVE] *= self.pn
-            self.histogram[self.map != Field.CAVE] *= self.pj
+            self.histogram *= self.entered_not_cave_mask
             print('{} this is nothing'.format(self.move_counter))
 
-        # print(self.histogram)
+        self.histogram /= norm
+        self.histogram[self.exit_location] = 0
+
+        fig, ax = plt.subplots()
+        grid = ax.imshow(self.histogram, cmap="GnBu")
+        grid.set_data(self.histogram)
+        plt.show()
+        print('ok')
 
     def move(self):
         self.move_counter += 1
@@ -67,7 +96,7 @@ class MyAgent(AgentStub):
         best_place = np.unravel_index(self.histogram.argmax(), self.histogram.shape)
         highest_p = 0.0
         next_move = (0,0)
-        # print(self.histogram)
+
         # for all neighbours
         for neighbour_direction in Action:
             neighbour_position = cyclic_position(best_place, neighbour_direction, (self.h, self.w))
@@ -76,15 +105,16 @@ class MyAgent(AgentStub):
                 highest_p = self.histogram[neighbour_position]
                 next_move = neighbour_position
 
+
         y_diff, y_direction = cyclic_distance(best_place[0], self.exit_location[0], self.h, (Action.UP, Action.DOWN))
         x_diff, x_direction = cyclic_distance(best_place[1], self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-        
+        target_direction = y_direction if y_diff < x_diff else x_direction
+        self.histogram = signal.convolve2d(self.histogram, self.actions_masks[target_direction], 'same', "wrap")
         # print("y:{}, {}; x:{} {}".format(y_diff, y_direction, x_diff, x_direction))
-        # direction = y_direction if y_diff < x_diff else x_direction
-        # print("decision is {}".format(direction))
+        # print("decision is {}".format(target_direction))
         # print("{}".format('-'*20))
 
-        return y_direction if y_diff < x_diff else x_direction
+        return target_direction
 
     def get_histogram(self):
         return self.histogram
