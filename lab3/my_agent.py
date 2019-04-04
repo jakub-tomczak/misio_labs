@@ -10,8 +10,8 @@ import numpy as np
 optilio_mode = False
 debug_mode = False
 draw_histogram = False
-plot_pause_seconds = 1
-local_test_file = 'tests/one.in'
+plot_pause_seconds = .5
+local_test_file = 'tests/2015.in'
 
 if not optilio_mode and draw_histogram:
     import matplotlib.pyplot as plt
@@ -94,24 +94,6 @@ class MyAgent(AgentStub):
         self.entered_not_cave_mask = np.where(self.map == Field.EMPTY, self.pj, self.pn)
         self.reset()
 
-    def is_move_acceptable(self, move):
-        if self.last_move is None:
-            return True
-        if move is None:
-            return True
-        if self.last_move != move:
-            return True
-        if self.last_move == move and self.the_same_direction_counter < 2:
-            return True
-        print('Too many moves in direction {}'.format(move))
-        return False
-
-    def commit_move(self, move):
-        if self.last_move != move:
-            self.last_move = move
-        else:
-            self.the_same_direction_counter += 1
-
     def sense(self, sensory_input: bool):
         if sensory_input == Field.CAVE:
             debug_print('{} this is cave'.format(self.move_counter))
@@ -131,48 +113,77 @@ class MyAgent(AgentStub):
         highest_p = 0.0
 
         max_val = self.histogram.max()
-        for r, row in enumerate(self.histogram):
-            for c, _ in enumerate(row):
-                if self.histogram[r,c] > max_val * .9:
-                    # dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
-                    # dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-                    # coeff = self.histogram[r, c]**2 * (self.h - dy + self.w - dx)
-                    # if coeff > highest_p:
-                    #     highest_p = coeff
-                    #     chosen_direction = y_direct if dy < dx else x_direct
+        votes = {
+            Action.LEFT: 0,
+            Action.RIGHT: 0,
+            Action.UP: 0,
+            Action.DOWN: 0
+        }
 
-                    for neighbour_direction in Action:
-                        neigh_pos = cyclic_position((r, c), neighbour_direction, (self.h, self.w))
-                        if self.histogram[neigh_pos] > highest_p:
-                            chosen_direction = neighbour_direction
-                            highest_p = self.histogram[neigh_pos]
+        if self.move_counter % 20 == 0:
+            chosen_direction = np.random.choice(Action)
+        else:
+            for r, row in enumerate(self.histogram):
+                for c, _ in enumerate(row):
+                    if self.histogram[r,c] > max_val * .90:
+                        dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
+                        dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
+                        votes[y_direct] += 1
+                        votes[x_direct] += 1
 
-                # for all neighbours
-                # for neighbour_direction in Action:
-                #     neighbour_position = cyclic_position(self.histogram[r, c], neighbour_direction, (self.h, self.w))
-                #     # find the one with the highest probability
-                #     # coeff = self.histogram[neighbour_position]**2 * (self.h - neighbour_position[0] + self.w - neighbour_position[1])
-                #     if coeff > highest_p and self.is_move_acceptable(chosen_direction):
-                #         highest_p = coeff
-                #         chosen_direction = neighbour_direction
+            votes_sorted = sorted(votes.items(), key=lambda x: x[1], reverse=True)
 
+            if self.move_counter > 1:
+                self.last_but_one_move = self.last_move
 
+            if self.last_move == votes_sorted[0][0]:
+                # votes_sorted[0][0] => direction with the highest number of votes
+                if self.last_move in [Action.LEFT, Action.RIGHT] and self.the_same_direction_counter < self.w - 1 \
+                    or self.last_move in [Action.UP, Action.DOWN] and self.the_same_direction_counter < self.h - 1:
+                    self.the_same_direction_counter += 1
+                    chosen_direction = votes_sorted[0][0]
+                else:
+                    # take the next move, we have chosen too many times move with the highest number of votes
+                    chosen_direction = votes_sorted[1][0]
+                    self.last_move = chosen_direction
+                    self.the_same_direction_counter = 0
+            else:
+                # new last move
+                chosen_direction = votes_sorted[0][0]
+                self.last_move = chosen_direction
+                self.the_same_direction_counter = 0
 
-        # self.commit_move(chosen_direction)
+            if chosen_direction in [Action.LEFT, Action.RIGHT] and self.last_but_one_move in [Action.LEFT, Action.RIGHT]:
+                self.returning += 1
+                if self.returning >= 2:
+                    for vote in votes_sorted:
+                        if vote[0] not in [Action.LEFT, Action.RIGHT]:
+                            chosen_direction = vote[0]
+                            break
+            elif chosen_direction in [Action.DOWN, Action.UP] and self.last_but_one_move in [Action.DOWN, Action.UP]:
+                self.returning += 1
+                if self.returning >= 2:
+                    for vote in votes_sorted:
+                        if vote[0] not in [Action.DOWN, Action.UP]:
+                            chosen_direction = vote[0]
+                            break
+            else:
+                self.returning = 0
+        self.last_move = chosen_direction
         # print('{}: {}'.format(self.move_counter, chosen_direction))
+        debug_print(chosen_direction)
+        self.plot_location()
         self.histogram = convolve2d(self.histogram, self.masks[chosen_direction], 'same', "wrap")
         self.histogram /= self.histogram.max()
         
         debug_print("decision is {}".format(chosen_direction))
         debug_print("{}".format('-'*20))
 
-        self.plot_location()
-
         return chosen_direction
 
 
     def reset(self):
-        print("resetting")
+        # print("resetting")
         self.histogram = np.ones_like(self.map)
         self.where_am_i = np.ones_like(self.map)
         self.holes_probabilities = np.ones_like(self.map)
@@ -181,6 +192,8 @@ class MyAgent(AgentStub):
         self.move_history = []
         self.the_same_direction_counter = 0
         self.last_move = None
+        self.last_but_one_move = None
+        self.returning = 0
         debug_print("exit location {}".format(self.exit_location))
 
     def plot_location(self):
@@ -192,8 +205,7 @@ class MyAgent(AgentStub):
             plt.pause(plot_pause_seconds)
 
 if __name__ == "__main__":
-    from super_agent import Wumpus
     if optilio_mode:
         run_agent(MyAgent)
     else:
-        test_locally(local_test_file, SnakeAgent, verbose=True)
+        test_locally(local_test_file, MyAgent, verbose=True)
