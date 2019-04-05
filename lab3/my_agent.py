@@ -10,7 +10,7 @@ import numpy as np
 optilio_mode = False
 debug_mode = False
 draw_histogram = False
-plot_pause_seconds = .5
+plot_pause_seconds = .2
 local_test_file = 'tests/2015.in'
 
 if not optilio_mode and draw_histogram:
@@ -120,55 +120,52 @@ class MyAgent(AgentStub):
             Action.DOWN: 0
         }
 
-        if self.move_counter % 20 == 0:
-            chosen_direction = np.random.choice(Action)
-        else:
-            for r, row in enumerate(self.histogram):
-                for c, _ in enumerate(row):
-                    if self.histogram[r,c] > max_val * .90:
-                        dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
-                        dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-                        votes[y_direct] += 1
-                        votes[x_direct] += 1
+        for r, row in enumerate(self.histogram):
+            for c, val in enumerate(row):
+                if val > max_val * .99:
+                    dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
+                    dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
+                    votes[y_direct] += val*2
+                    votes[x_direct] += val*2
 
-            votes_sorted = sorted(votes.items(), key=lambda x: x[1], reverse=True)
+        votes_sorted = sorted(votes.items(), key=lambda x: x[1], reverse=True)
 
-            if self.move_counter > 1:
-                self.last_but_one_move = self.last_move
+        if self.move_counter > 1:
+            self.last_but_one_move = self.last_move
 
-            if self.last_move == votes_sorted[0][0]:
-                # votes_sorted[0][0] => direction with the highest number of votes
-                if self.last_move in [Action.LEFT, Action.RIGHT] and self.the_same_direction_counter < self.w - 1 \
-                    or self.last_move in [Action.UP, Action.DOWN] and self.the_same_direction_counter < self.h - 1:
-                    self.the_same_direction_counter += 1
-                    chosen_direction = votes_sorted[0][0]
-                else:
-                    # take the next move, we have chosen too many times move with the highest number of votes
-                    chosen_direction = votes_sorted[1][0]
-                    self.last_move = chosen_direction
-                    self.the_same_direction_counter = 0
-            else:
-                # new last move
+        if self.last_move == votes_sorted[0][0]:
+            # votes_sorted[0][0] => direction with the highest number of votes
+            if self.last_move in [Action.LEFT, Action.RIGHT] and self.the_same_direction_counter < self.w - 1 \
+                or self.last_move in [Action.UP, Action.DOWN] and self.the_same_direction_counter < self.h - 1:
+                self.the_same_direction_counter += 1
                 chosen_direction = votes_sorted[0][0]
+            else:
+                # take the next move, we have chosen too many times move with the highest number of votes
+                chosen_direction = votes_sorted[1][0]
                 self.last_move = chosen_direction
                 self.the_same_direction_counter = 0
+        else:
+            # new last move
+            chosen_direction = votes_sorted[0][0]
+            self.last_move = chosen_direction
+            self.the_same_direction_counter = 0
 
-            if chosen_direction in [Action.LEFT, Action.RIGHT] and self.last_but_one_move in [Action.LEFT, Action.RIGHT]:
-                self.returning += 1
-                if self.returning >= 2:
-                    for vote in votes_sorted:
-                        if vote[0] not in [Action.LEFT, Action.RIGHT]:
-                            chosen_direction = vote[0]
-                            break
-            elif chosen_direction in [Action.DOWN, Action.UP] and self.last_but_one_move in [Action.DOWN, Action.UP]:
-                self.returning += 1
-                if self.returning >= 2:
-                    for vote in votes_sorted:
-                        if vote[0] not in [Action.DOWN, Action.UP]:
-                            chosen_direction = vote[0]
-                            break
-            else:
-                self.returning = 0
+        if chosen_direction in [Action.LEFT, Action.RIGHT] and self.last_but_one_move in [Action.LEFT, Action.RIGHT]:
+            self.returning += 1
+            if self.returning >= 2:
+                for vote in votes_sorted:
+                    if vote[0] not in [Action.LEFT, Action.RIGHT]:
+                        chosen_direction = vote[0]
+                        break
+        elif chosen_direction in [Action.DOWN, Action.UP] and self.last_but_one_move in [Action.DOWN, Action.UP]:
+            self.returning += 1
+            if self.returning >= 2:
+                for vote in votes_sorted:
+                    if vote[0] not in [Action.DOWN, Action.UP]:
+                        chosen_direction = vote[0]
+                        break
+        else:
+            self.returning = 0
         self.last_move = chosen_direction
         # print('{}: {}'.format(self.move_counter, chosen_direction))
         debug_print(chosen_direction)
@@ -208,4 +205,4 @@ if __name__ == "__main__":
     if optilio_mode:
         run_agent(MyAgent)
     else:
-        test_locally(local_test_file, MyAgent, verbose=True)
+        test_locally(local_test_file, MyAgent)
