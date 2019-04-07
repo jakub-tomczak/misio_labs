@@ -73,6 +73,9 @@ def create_convolution_masks(p1, p2):
     }
 
 
+def pita_pita_pita(a, b):
+    return pow(a**2 + b**2, .5)
+
 class Move:
     def __init__(self, location, dy, dx, p, dir):
         self.location = location
@@ -125,8 +128,8 @@ class MyAgent(AgentStub):
                 if val > max_val * .99:
                     dy, y_direct = cyclic_distance(r, self.exit_location[0], self.h, (Action.UP, Action.DOWN))
                     dx, x_direct = cyclic_distance(c, self.exit_location[1], self.w, (Action.LEFT, Action.RIGHT))
-                    votes[y_direct] += val*2
-                    votes[x_direct] += val*2
+                    votes[y_direct] += val**2 + (1 - dy/(self.h*.5))**3
+                    votes[x_direct] += val**2 + (1 - dx/(self.w*.5))**3
 
         votes_sorted = sorted(votes.items(), key=lambda x: x[1], reverse=True)
 
