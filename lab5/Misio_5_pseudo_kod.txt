@@ -1,0 +1,39 @@
+p0 = prawdopodobieństwo wystąpienia brudu na polu podczas inicjalizacji
+p = prawdopodobieństwo wystąpienia brudu w dalszych krokach
+n liczba kroków
+
+kluczowe jest zapamiętanie już obliczonych wartości stanów aby uniknąć złożoności 4^n lepsze jest 4 * n :)
+BUDOWA STANU
+probability_of_dust_in_the_other_room
+room_status
+environment_lifetime
+
+calculate_optimal_result(): # START POINT
+	value1 = Oblicz wartość stanu początkowego dla zaczęcia na polu z brudem
+        value2 = Oblicz wartość stanu początkowego dla zaczęcia na polu bez brudu
+	rezultat = p0 * value1 + (1-p0) * value2
+
+calculate_optimal_result_for_state(state: State):
+       Jeśli wartość życia środowiska w stanie jest niedodatnia:
+	    zwróć wartość 0 # stan wykracza poza okres życia środowiska.
+	W przeciwnym razie
+	    Ustaw maksymalną wartość stanu na 0 (Wartość neutrlana dla funkcji oceny)
+
+            Dla każdej akcji a dostępnej w stanie #MAX a
+                Lokalna wartość stanu dla wykonania akcji a = 0
+                Lokalna wartość stanu += Nagroda za wykonanie akcji w tym stanie # Reward ( Action , State)
+
+                Dla każdego stanu pomieszczenia  # Sum above next states rewards
+	            Oblicz prawdopodobieństwo znalezienia się w tym stanie TRANSFORM_P # szansa na przejście do utworzonego za chwilę stanu
+		    Oblicz prawdopodobieństwo wystąpienia brudu w sąsiednim pomieszczeniu w stanie NEXT_ROOM_DUST_P # jedna z składowych następnego stanu
+		    Wygeneruj nowy stan pomieszczenia po akcji. NEXT_STATE # nowy stan ze stanem pomieszczenia z pętli i długośćią życia o 1 mniejszą.
+		    Sprawdź czy obliczyłeś już wartość dla tego stanu jeśli tak:
+			Lokalna wartość stanu += TRANSFORM_P * map(NEXT_STATE).getValue()
+		    W przeciwnym razie
+			value = calculate_optimal_result_for_state(NEXT_STATE)
+			Dodaj stan i wartość do mapy
+			Lokalna wartość stanu += TRANSFORM_P * value
+               
+                Jeśli Lokalna Wartość stanu > Maksymalna wartość stanu:
+                    Maksymalna wartość stanu = Lokalna Wartość stanu
+            zwróć Maksymalną wartość stanu
