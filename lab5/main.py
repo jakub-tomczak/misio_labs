@@ -15,20 +15,7 @@ class Reward(Enum):
 class State:
     p = 0.0
     p0 = 0.0
-    max_steps = 0
 
-    def __init__(self, is_clean: bool, step_num: int, p: float):
-        self.step = step_num
-        self.is_clean = is_clean
-        self.p = p
-
-    def __hash__(self):
-        return hash(self.step) * hash(self.is_clean) * hash(self.p)
-
-    def __eq__(self, other):
-        if other is State:
-            return other.step == self.step and other.is_clean == self.is_clean and other.p == self.p
-        return False
 
 known_step = dict()
 
@@ -45,40 +32,48 @@ def np(px, p):
     return px + (1-px)*p
 
 
-def step(state: State):
-    if state.step <= 0:
-        return 0
+def step(state: (bool, int, float)):
+    step_num = state[1] - 1
+    px = np(state[2], State.p)
 
-    if step in known_step:
-        return known_step
-
-    step_num = state.step - 1
-
-    px = np(state.p, State.p)
-
-    points_go = reward(state.is_clean, Action.GO)
-    points_suck = reward(state.is_clean, Action.SUCK)
+    points_go = reward(state[0], Action.GO)
+    points_suck = reward(state[0], Action.SUCK)
 
     # points go
-    points_go += step(State(False, step_num, State.p))*px
-    points_go += step(State(True, step_num, State.p))*(1-px)
+    points_go += calculate_or_get_from_dict((False, step_num, State.p))*px
+    points_go += calculate_or_get_from_dict((True, step_num, State.p))*(1-px)
+
 
     # points suck
-    points_suck += step(State(False, step_num, px))*State.p
-    points_suck += step(State(True, step_num, px))*(1-State.p)
+    points_suck += calculate_or_get_from_dict((False, step_num, px))*State.p
+    points_suck += calculate_or_get_from_dict((True, step_num, px))*(1-State.p)
 
-    return max(points_suck, points_go)
+    res = max(points_suck, points_go)
+    known_step[state] = res
+    return res
+
+
+def calculate_or_get_from_dict(state):
+    if state[1] <= 0:
+        return 0
+
+    if state in known_step:
+        return known_step[state]
+    else:
+        res = step(state)
+        known_step[state] = res
+
+        return res
 
 
 def calc(p0, p, steps):
     State.p = p
     State.p0 = p0
-    State.max_steps = steps
 
-    dirty_state = State(False, steps, p)
-    clean_state = State(True, steps, p)
+    dirty_state = (False, steps, State.p0)
+    clean_state = (True, steps, State.p0)
 
-    return step(dirty_state)*p0 + (1-p0)*step(clean_state)
+    return calculate_or_get_from_dict(dirty_state)*State.p0 + (1-State.p0)*calculate_or_get_from_dict(clean_state)
 
 
 def load_and_run():
