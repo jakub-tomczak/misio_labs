@@ -17,7 +17,7 @@ class StoreAgent(object):
         self.f = 0
 
     def run(self):
-        arr = np.zeros((self.m + 1, self.m + 1))
+        arr = np.random.random_integers(self.f * 2, size=(self.m + 1, self.m + 1)) - self.f
         np.savetxt(sys.stdout.buffer, arr, fmt='%d')
         return arr
 
