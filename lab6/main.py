@@ -4,6 +4,10 @@ import sys
 OPTILIO_MODE = False
 
 
+def print_numpy_array(array: np.ndarray):
+    np.savetxt(sys.stdout.buffer, array, fmt='%d')
+
+
 class StoreAgent(object):
     def __init__(self, m: int):
         self.m = m
