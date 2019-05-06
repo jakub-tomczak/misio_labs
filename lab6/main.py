@@ -41,6 +41,7 @@ class ShopsState:
         self.s1_state = s1_state
         self.s2_state = s2_state
 
+
 class Action:
     def __init__(self, s1, s2, state, i):
         self.s1 = s1
@@ -155,10 +156,12 @@ class StoreAgent(object):
             key = ()
             if key not in self.possible_actions:
                 self.possible_actions[key] = []
-            self.possible_actions.append(Action(_s1, _s2, i, income))
+            self.possible_actions.append(Action(_s1, _s2, income, i))
 
     def calc_result(self, s1, s2, income):
         self.possible_actions
+
+        return 0
 
     def simulation(self):
         simulation_count = 1000
@@ -189,30 +192,28 @@ class StoreAgent(object):
         return arr
 
     def run(self):
-        return self.simulation()
-        # self.get_poissons_probabilities()
-        # arr = np.zeros((self.m + 1, self.m + 1))
-        #
-        # night_state = np.zeros_like(arr)
-        # day_state = np.zeros_like(arr)
-        #
-        # income = []
-        # for s1 in range(self.m + 1):
-        #     row = []
-        #     for s2 in range(self.m + 1):
-        #         row.append(self.generate_shops_state(s1, s2))
-        #     income.append(row)
-        # for s1 in range(self.m+1):
-        #     for s2 in range(self.m+1):
-        #         self.get_first_state(s1, s2, income)
-        # for s1 in range(self.m+1):
-        #     for s2 in range(self.m+1):
-        #         arr[s1, s2] = self.calc_result(s1, s2, income)
-        #
-        # print_numpy_array(arr)
-        # return arr
+        # return self.simulation()
+        self.get_poissons_probabilities()
+        arr = np.zeros((self.m + 1, self.m + 1))
 
+        night_state = np.zeros_like(arr)
+        day_state = np.zeros_like(arr)
 
+        income = []
+        for s1 in range(self.m + 1):
+            row = []
+            for s2 in range(self.m + 1):
+                row.append(self.generate_shops_state(s1, s2))
+            income.append(row)
+        for s1 in range(self.m+1):
+            for s2 in range(self.m+1):
+                self.get_first_state(s1, s2, income)
+        for s1 in range(self.m+1):
+            for s2 in range(self.m+1):
+                arr[s1, s2] = self.calc_result(s1, s2, income)
+
+        print_numpy_array(arr)
+        return arr
 
 def run_agent():
     n_worlds = int(input())
