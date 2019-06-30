@@ -107,7 +107,7 @@ class QLearningAgent(ReinforcementAgent):
         # Pick Action
         legalActions = self.getLegalActions(state)
         action = None
-        # return self.computeActionFromQValues(state)
+        return self.computeActionFromQValues(state)
         if random.uniform(0, 1) < self.epsilon:
             action = random.choice(legalActions)
         else:
@@ -181,21 +181,14 @@ class ApproximateQAgent(PacmanQAgent):
         self.featExtractor = MyExtractor()
         # self.featExtractor = lookup(extractor, globals())()
         PacmanQAgent.__init__(self, **args)
-        self.train = True
-        self.start_with_trained_weights = False
+        self.train = False
+        self.start_with_trained_weights = True
 
         if self.train:
             self.weights = CustomCounter()
         if self.start_with_trained_weights:
-            self.weights = {'eats-food': 3.744196232507296, 'closest-food': -0.04577473069235167,
-                            '#-of-ghosts-1-step-away': -10.027445395331362, 'bias': -6.304746841317069}
-            self.weights = {'closest-food': -0.22951029132156853, 'bias': -4.170777978948849,
-                            'eats-food': 16.0819729975654, '#-of-ghosts-1-step-away': -20.039070472163942}
-            self.weights = {'eats-food': 9.225608231341734, '#-of-ghosts-1-step-away': -10.04654308633642,
-             'closest-food': -0.051771433154542724, 'ghost-is-nearby': -5.5611346230803385, 'bias': -1.2603806298917135}
-            # {'eats-food': 37.360767167706875, 'bias': 25.27582030047325, '#-of-ghosts-1-step-away': -10.04654308633642,
-            #  'ghost-is-nearby': -0.8216333338733044, 'closest-food': -0.09775641031365388}
-
+            # self.weights = {'capsule-is-nearby': 0.0, 'bias': -5.848186678365304, 'ghost-is-nearby': -47.767678591296, 'eats-food': 4.2052171620675125, '#-of-ghosts-1-step-away': -10.053403840432816, 'closest-food': -0.09139458036757105}
+            self.weights = {'ghost-is-nearby': -19.71752071573443, 'bias': -5.853012565325543, 'eats-food': 4.2186468885699115, '#-of-ghosts-1-step-away': -10.029721097702556, 'closest-food': -0.09146973122692789}
         # print('train: ', self.train, 'start_with_trained_weights', self.start_with_trained_weights)
 
     def getWeights(self):
@@ -308,26 +301,30 @@ def closestFood(pos, food, walls):
     return None
 
 
-def position_of_the_nearest_ghost(pos, ghosts_position, walls, cutout = 3):
+def distance_to_the_nearest_item_from_list(pos, items_positions, walls, cutout=3):
     """
-    returns the distance to the nearest ghost
+    returns the distance to the item from items_positions (ghosts, capsules,...)
+    cutout is used to stop searching when distance is getting higher than cutout value
     """
     fringe = [(pos[0], pos[1], 0)]
     expanded = set()
     while fringe:
         pos_x, pos_y, dist = fringe.pop(0)
 
-        if dist > cutout:
-            continue
         if (pos_x, pos_y) in expanded:
             continue
+        if dist > cutout:
+            continue
+
         expanded.add((pos_x, pos_y))
         # if we find a food at this location then exit
-        if (pos_x, pos_y) in ghosts_position:
+        if (pos_x, pos_y) in items_positions:
             return dist
         # otherwise spread out from the location to its neighbours
         nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
         for nbr_x, nbr_y in nbrs:
+            if nbr_x == pos[0] and nbr_y == pos[1] or nbr_x==pos_x and nbr_y==pos_y:
+                continue
             fringe.append((nbr_x, nbr_y, dist + 1))
     # no ghost found
     return None
@@ -411,12 +408,16 @@ class MyExtractor(FeatureExtractor):
         dx, dy = Actions.directionToVector(action)
         next_x, next_y = int(x + dx), int(y + dy)
 
+        not_scared_ghosts_positions = [g_s.getPosition()
+                                       for g_s in state.getGhostStates()
+                                       if not g_s.scaredTimer]
+
         # count the number of ghosts 1-step away
         # get position of ghost only when it is not scared
         # in this way pacman may learn to eat scared ghost
         features["#-of-ghosts-1-step-away"] = sum(
-            (next_x, next_y) in Actions.getLegalNeighbors(g_s.getPosition(), walls)
-            for g_s in state.getGhostStates() if not g_s.scaredTimer)
+            (next_x, next_y) in Actions.getLegalNeighbors(g_s, walls)
+            for g_s in not_scared_ghosts_positions)
 
         # ghost_quarters = [get_quarter_from_position(ghost_position, walls)
         #                   for ghost_position in state.getGhostPositions()]
@@ -426,8 +427,26 @@ class MyExtractor(FeatureExtractor):
         # else:
         #     features['pacman-and-ghosts-in-the-same-region'] = 0.0
 
-        distance_to_ghost = position_of_the_nearest_ghost((next_x, next_y), state.getGhostPositions(), walls)
-        features['ghost-is-nearby'] = 1.0 if distance_to_ghost is not None and distance_to_ghost < 3 else 0.0
+        ghost_distance_limit = 3
+        nearest_ghost = distance_to_the_nearest_item_from_list((next_x, next_y), not_scared_ghosts_positions, walls, cutout=3)
+        if nearest_ghost is not None:
+            nearest_ghost = max(nearest_ghost-1, 0)
+            if nearest_ghost < 1:
+                features['ghost-is-nearby'] = 2
+            else:
+                features['ghost-is-nearby'] = (ghost_distance_limit - nearest_ghost) / ghost_distance_limit
+        else:
+            features['ghost-is-nearby'] = 0
+
+
+        # nearest_capsule = distance_to_the_nearest_item_from_list((next_x, next_y), state.getCapsules(), walls, cutout=0)
+
+        ## set 1.0 if the nearest capsule is closer than the nearest ghost
+        # if nearest_capsule is not None and nearest_ghost is None or \
+        #         nearest_capsule is not None and nearest_ghost is not None and nearest_capsule < nearest_ghost:
+        #     features["capsule-is-nearby"] = 1.0
+        # features["capsule-is-nearby"] = 1.0 if nearest_capsule is not None else 0.0
+
 
         # if there is no danger of ghosts then add the food feature
         if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
