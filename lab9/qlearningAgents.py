@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # qlearningAgents.py
 # ------------------
 # Licensing Information:  You are free to use or extend these projects for
