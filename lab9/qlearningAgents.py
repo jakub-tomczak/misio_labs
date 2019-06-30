@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-
-# qlearningAgents.py
+# # qlearningAgents.py
 # ------------------
 # Licensing Information:  You are free to use or extend these projects for
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -16,10 +15,10 @@
 
 from misio.pacman.game import *
 from misio.pacman.learningAgents import ReinforcementAgent
-from .featureExtractors import *
 from misio.pacman.util import CustomCounter, lookup
 import random, math
 import numpy as np
+from misio.optilio.pacman import StdIOPacmanRunner
 
 
 class QLearningAgent(ReinforcementAgent):
@@ -108,6 +107,7 @@ class QLearningAgent(ReinforcementAgent):
         # Pick Action
         legalActions = self.getLegalActions(state)
         action = None
+        # return self.computeActionFromQValues(state)
         if random.uniform(0, 1) < self.epsilon:
             action = random.choice(legalActions)
         else:
@@ -139,7 +139,7 @@ class QLearningAgent(ReinforcementAgent):
 class PacmanQAgent(QLearningAgent):
     "Exactly the same as QLearningAgent, but with different default parameters"
 
-    def __init__(self, epsilon=0.05, gamma=0.8, alpha=0.2, numTraining=0, **args):
+    def __init__(self, epsilon=0.05, gamma=0.5, alpha=0.2, numTraining=0, **args):
         """
         These default parameters can be changed from the pacman.py command line.
         For example, to change the exploration rate, try:
@@ -181,14 +181,21 @@ class ApproximateQAgent(PacmanQAgent):
         self.featExtractor = MyExtractor()
         # self.featExtractor = lookup(extractor, globals())()
         PacmanQAgent.__init__(self, **args)
-        self.train = False
-        self.start_with_trained_weights = True
+        self.train = True
+        self.start_with_trained_weights = False
 
         if self.train:
             self.weights = CustomCounter()
         if self.start_with_trained_weights:
-           self.weights = {'eats-food': 3.744196232507296, 'closest-food': -0.04577473069235167,
+            self.weights = {'eats-food': 3.744196232507296, 'closest-food': -0.04577473069235167,
                             '#-of-ghosts-1-step-away': -10.027445395331362, 'bias': -6.304746841317069}
+            self.weights = {'closest-food': -0.22951029132156853, 'bias': -4.170777978948849,
+                            'eats-food': 16.0819729975654, '#-of-ghosts-1-step-away': -20.039070472163942}
+            self.weights = {'eats-food': 9.225608231341734, '#-of-ghosts-1-step-away': -10.04654308633642,
+             'closest-food': -0.051771433154542724, 'ghost-is-nearby': -5.5611346230803385, 'bias': -1.2603806298917135}
+            # {'eats-food': 37.360767167706875, 'bias': 25.27582030047325, '#-of-ghosts-1-step-away': -10.04654308633642,
+            #  'ghost-is-nearby': -0.8216333338733044, 'closest-food': -0.09775641031365388}
+
         # print('train: ', self.train, 'start_with_trained_weights', self.start_with_trained_weights)
 
     def getWeights(self):
@@ -301,6 +308,44 @@ def closestFood(pos, food, walls):
     return None
 
 
+def position_of_the_nearest_ghost(pos, ghosts_position, walls, cutout = 3):
+    """
+    returns the distance to the nearest ghost
+    """
+    fringe = [(pos[0], pos[1], 0)]
+    expanded = set()
+    while fringe:
+        pos_x, pos_y, dist = fringe.pop(0)
+
+        if dist > cutout:
+            continue
+        if (pos_x, pos_y) in expanded:
+            continue
+        expanded.add((pos_x, pos_y))
+        # if we find a food at this location then exit
+        if (pos_x, pos_y) in ghosts_position:
+            return dist
+        # otherwise spread out from the location to its neighbours
+        nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
+        for nbr_x, nbr_y in nbrs:
+            fringe.append((nbr_x, nbr_y, dist + 1))
+    # no ghost found
+    return None
+
+
+def get_quarter_from_position(position, walls):
+    half_x = walls.width // 2
+    half_y = walls.height // 2
+    if position[0] > half_x and position[1] > half_y:
+        return 0
+    elif position[0] > half_x and position[1] < half_y:
+        return 1
+    elif position[0] < half_x and position[1] < half_y:
+        return 2
+    else:
+        return 3
+
+
 class SimpleExtractor(FeatureExtractor):
     """
     Returns simple features for a basic reflex Pacman:
@@ -373,6 +418,17 @@ class MyExtractor(FeatureExtractor):
             (next_x, next_y) in Actions.getLegalNeighbors(g_s.getPosition(), walls)
             for g_s in state.getGhostStates() if not g_s.scaredTimer)
 
+        # ghost_quarters = [get_quarter_from_position(ghost_position, walls)
+        #                   for ghost_position in state.getGhostPositions()]
+        #
+        # if all(ghost_quarters) == get_quarter_from_position((x, y), walls):
+        #     features['pacman-and-ghosts-in-the-same-region'] = 1.0
+        # else:
+        #     features['pacman-and-ghosts-in-the-same-region'] = 0.0
+
+        distance_to_ghost = position_of_the_nearest_ghost((next_x, next_y), state.getGhostPositions(), walls)
+        features['ghost-is-nearby'] = 1.0 if distance_to_ghost is not None and distance_to_ghost < 3 else 0.0
+
         # if there is no danger of ghosts then add the food feature
         if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
             features["eats-food"] = 1.0
@@ -388,7 +444,7 @@ class MyExtractor(FeatureExtractor):
         return features
 
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     runner = StdIOPacmanRunner()
     games_num = int(input())
     agent = ApproximateQAgent()
