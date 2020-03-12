@@ -42,7 +42,8 @@ def colorToVector(color):
     return map(lambda x: int(x, 16) / 256.0, [color[1:3], color[3:5], color[5:7]])
 
 if _Windows:
-    raise Exception("Don't use Windows. It's a virus.")
+    pass
+    # raise Exception("Don't use Windows. It's a virus.")
 else:
     _canvas_tfonts = ['times', 'lucidasans-24']
     pass # XXX need defaults here
