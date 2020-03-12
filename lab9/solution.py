@@ -15,10 +15,10 @@
 
 from misio.pacman.game import *
 from misio.pacman.learningAgents import ReinforcementAgent
-from .featureExtractors import *
 from misio.pacman.util import CustomCounter, lookup
 import random, math
 import numpy as np
+from misio.optilio.pacman import StdIOPacmanRunner
 
 
 class QLearningAgent(ReinforcementAgent):
@@ -180,7 +180,7 @@ class ApproximateQAgent(PacmanQAgent):
         self.featExtractor = MyExtractor()
         # self.featExtractor = lookup(extractor, globals())()
         PacmanQAgent.__init__(self, **args)
-        self.train = False
+        self.train = True
         self.start_with_trained_weights = True
 
         if self.train:
@@ -188,6 +188,7 @@ class ApproximateQAgent(PacmanQAgent):
         if self.start_with_trained_weights:
            self.weights = {'eats-food': 3.744196232507296, 'closest-food': -0.04577473069235167,
                             '#-of-ghosts-1-step-away': -10.027445395331362, 'bias': -6.304746841317069}
+
         # print('train: ', self.train, 'start_with_trained_weights', self.start_with_trained_weights)
 
     def getWeights(self):

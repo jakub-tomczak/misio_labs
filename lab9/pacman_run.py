@@ -3,6 +3,8 @@
 import numpy as np
 import random
 import tqdm
+
+from lab9.optilio_oliwia import OliwiaApproximateQAgent
 from misio.util import generate_deterministic_seeds
 
 
@@ -20,7 +22,7 @@ def parse_args():
     parser = ArgumentParser(description="Pacman runner program.", formatter_class=ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-n", "--num-games", type=int,
-                        help="the number of GAMES to play", metavar="GAMES", default=1)
+                        help="the number of GAMES to play", metavar="GAMES", default=100)
     parser.add_argument("-l", "--layout",
                         help="the LAYOUT_FILE from which to load the map layout",
                         metavar="LAYOUT_FILE", default="pacman_layouts/mediumClassic.lay")
@@ -28,7 +30,7 @@ def parse_args():
                         help="the agent CLASS to use",
                         metavar="CLASS", default="misio.pacman.keyboardAgents.KeyboardAgent")
     parser.add_argument("-ng", "--no_graphics", action="store_true",
-                        help="Generate no graphics output.", default=False)
+                        help="Generate no graphics output.", default=True)
     parser.add_argument("-rg", "--random-ghosts",
                         action="store_true", default=False,
                         help="Use random ghosts rather malicious ones.")
@@ -58,7 +60,15 @@ if __name__ == "__main__":
     else:
         seeds = None
     # Choose a Pacman agent
-    AgentClass = load_agent(args.agent)
+    # from lab9.dqn import DQNAgent
+    # AgentClass = DQNAgent
+
+    from lab9.qlearningAgents import ApproximateQAgent
+    # from lab9.kz2 import ApproximateQAgent
+    AgentClass = ApproximateQAgent # OliwiaApproximateQAgent
+    # AgentClass = load_agent(args.agent)
+
+    print('Using agent {}'.format(AgentClass))
     agent = AgentClass()
     from misio.pacman.pacman import LocalPacmanGameRunner
 

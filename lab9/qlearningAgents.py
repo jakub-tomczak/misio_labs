@@ -432,7 +432,7 @@ class MyExtractor(FeatureExtractor):
         if nearest_ghost is not None:
             nearest_ghost = max(nearest_ghost-1, 0)
             if nearest_ghost < 1:
-                features['ghost-is-nearby'] = 2
+                features['ghost-is-nearby'] = 1
             else:
                 features['ghost-is-nearby'] = (ghost_distance_limit - nearest_ghost) / ghost_distance_limit
         else:

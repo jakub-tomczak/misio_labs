@@ -22,7 +22,7 @@ from .util import manhattan_distance
 
 """
 Pacman.py holds the logic for the classic pacman game along with the main
-code to run a game.  This file is divided into three sections:
+code PacmanQAgentto run a game.  This file is divided into three sections:
 
   (i)  Your interface to the pacman world:
           Pacman is a complex environment.  You probably don't want to
