@@ -1,15 +1,17 @@
-# Niepewność w świecie Wumpusa
+# Lab 2 Niepewność w świecie Wumpusa
 
 ## Cel
 Praktyczne zastosowanie rachunku prawdopodobieństwa dla celów AI.
 
 ## Zadanie
-Napisz program, który wczyta plik zawierający opis środowiska uproszczonego Wumpus’a i dla każdego pola świata wywnioskuje prawdopodobieństwo, że pole zawiera jamę biorąc pod uwagę aktualną wiedzę agenta.
+Napisz program, który wczyta plik zawierający opis prostego środowiska Wumpus’a i dla każdego pola świata wywnioskuje prawdopodobieństwo, że pole zawiera jamę biorąc pod uwagę aktualną wiedzę agenta.
 
 
 W ten sposób agent aktualizuje swoją wiedzę o stanie środowiska (wnioskuje na temat nieobserwowalnej części świata).
 
->> Do odpalenia zadania lokalnie  **może** się przydać pakiet [misio](../misio).
+>> Do odpalenia zadania lokalnie przyda się pakiet [misio](../misio).
+
+[Oryginalny wykład z AIMA](http://aima.eecs.berkeley.edu/slides-pdf/chapter13.pdf)
 
 ## Opis wejścia i wyjścia
 
@@ -25,7 +27,7 @@ W ten sposób agent aktualizuje swoją wiedzę o stanie środowiska (wnioskuje n
 * Praca indywidualna.
 * Program należy zgłosić na [Optil.io](https://www.optil.io/optilion/problem/3159) (nie ma sprawozdania).
 * Program ma **liczyć** poprawny wynik, w przypadku wykrycia programu, który przekleja na sztywno wpisane wartości (np. te z udostpęnionych plików wejściowych) nie zostanie uznany.
-* Termin: **przed** kolejnymi zajęciami (planowo tydzień)
+* Termin: **przed** kolejnymi zajęciami (tydzień)
 
 ## Punktacja
 * **15** punktów - średnia z 15 instancji; do części z nich zostały opublikowane pliki wejściowe, a do części nawet pliki wyjściowe, vide [test_cases](test_cases)
